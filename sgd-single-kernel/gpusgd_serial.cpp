@@ -24,7 +24,7 @@ workseg **sWorkseg;	// size: (subBlockNumL * subBlockNumL) * subBlockLen, ¼´ bid
 rateNode *rateNodeArray;
 subBlock *subBlockArray;	// size: subBlockNumL * subBlockNumL¸ö×Ó¿é
 
-
+ 
 /********************************* BEGIN:  *********************************/
 /********************************** END:  **********************************/
 
