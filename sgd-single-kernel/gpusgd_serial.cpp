@@ -83,7 +83,6 @@ void labelNodeInSubBlock(sSubBlock &subBlock)
 	}
 }
 
-
 // 计算子块bid中所有label标签的评价值数目seg(bid, label)，保存到mSeg数组的第bid行
 void computeSeg(int bid)
 {
@@ -106,6 +105,14 @@ void computeWorkseg(int bid, int tag)
 		mWorkseg[bid][tag].from += mSeg[bid][i];
 	}
 	mWorkseg[bid][tag].to = mWorkseg[bid][tag].from + mSeg[bid][tag];
+}
+
+// 设置子块所属的pattern
+void setPattern(sSubBlock &subBlock)
+{
+	int x = subBlock.subBlockIdxX;
+	int y = subBlock.subBlockIdxY;
+	subBlock.pattern = (subBlockNumL - x + y) % subBlockNumL;
 }
 
 // 取消：直接复制指针，不要重复分配空间
@@ -406,10 +413,18 @@ void getBlockXY(int u, int i, int &x, int &y)
 
 // 记录子块b_xy的ID: bid到二维数组pattern(s, t) 
 // 子块b_xy 是第s种模式中的第t个子块, 则把computeSubBlockID(z, x, y)的结果放入pattern(s,t)
-void setPattern(int **matrixPattern, int s, int t, int subBlockLen, int x, int y)
+void setPattern(int s, int t, int x, int y)
 {
 	matrixPattern[s][t] = computeSubBlockID(subBlockLen, x, y);
 }
+
+// 记录子块b_xy的ID: bid到二维数组pattern(s, t) 
+// 子块bid是第s种模式中的第t个子块, 则把bid放入pattern(s,t)
+void setPattern(int s, int t, int bid)
+{
+	matrixPattern[s][t] = bid;
+}
+
 
 // 返回：subset(x, y)
 // 子块 b_xy 包含的评价值个数(非零元素)

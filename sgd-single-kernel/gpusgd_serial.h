@@ -51,6 +51,7 @@ struct sSubBlock
 	int subBlockIdxY;
 	int rateNum;
 	sRateNode *subBlockNodeArray;
+	int pattern;
 
 	sSubBlock() {}
 	sSubBlock(int blockId, int size, sRateNode *nodeArray = NULL): 
@@ -70,7 +71,7 @@ void allocSubBlockNodeArray(sSubBlock &subBlock);
 */
 
 // 对子块内所有rateNode进行label
-void labelNodeInSubBlock();
+void labelNodeInSubBlock(sSubBlock &subBlock);
 
 // 计算子块bid中所有标签的评价值数目，保存到seg数组的第bid行
 void computeSeg(int bid);
@@ -78,6 +79,9 @@ void computeSeg(int bid);
 // 利用记录的数组seg得出每个workseg的from和to
 // 计算workseg(bid, label)的from和to，即子块bid中评价值label的起始位置
 void computeWorkseg(int bid, int tag);
+
+// 设置子块所属的pattern
+void setPattern(sSubBlock &subBlock);
 
 // 取消：直接复制指针，不要重复分配空间
 /*
@@ -173,7 +177,11 @@ void getBlockXY(int u, int i, int &x, int &y);
 
 // 记录子块b_xy的ID: bid到二维数组pattern(s, t) 
 // 子块b_xy 是第s种模式中的第t个子块, 则把computeSubBlockID(z, x, y)的结果放入pattern(s,t)
-void setPattern(int **matrixPattern, int s, int t, int subBlockLen, int x, int y);
+void setPattern(int s, int t, int x, int y);
+
+// 记录子块b_xy的ID: bid到二维数组pattern(s, t) 
+// 子块bid是第s种模式中的第t个子块, 则把bid放入pattern(s,t)
+void setPattern(int s, int t, int bid);
 
 // 返回：subset(x, y)
 // 子块 b_xy 包含的评价值个数(非零元素)
