@@ -13,35 +13,32 @@ int **matrixPattern;	// size: subBlockNumL * subBlockNumL, 即 模式s * 子块t
 int **matrixSubset;		// size: (subBlockNumL * subBlockNumL)
 
 // 子块bid在评分矩阵中的边界beg和end
-workset *sWorkset;	// size: (subBlockNumL * subBlockNumL)
+sWorkset *mWorkset;	// size: (subBlockNumL * subBlockNumL)
 
 // 子块bid中标有tag标签的评价值数目
-int **seg;			// size: (subBlockNumL * subBlockNumL) * subBlockLen, 即 bid*tag
+int **mSeg;			// size: (subBlockNumL * subBlockNumL) * subBlockLen, 即 bid*tag
 
 // 子块bid中每个评价值组tag的边界from和to
-workseg **sWorkseg;	// size: (subBlockNumL * subBlockNumL) * subBlockLen, 即 bid*tag
+sWorkseg **mWorkseg;	// size: (subBlockNumL * subBlockNumL) * subBlockLen, 即 bid*tag
 
-rateNode *rateNodeArray;
-subBlock *subBlockArray;	// size: subBlockNumL * subBlockNumL个子块
+sRateNode *rateNodeArray;
+sSubBlock *subBlockArray;	// size: subBlockNumL * subBlockNumL个子块
 
 
 
 /********************************* BEGIN:  *********************************/
 /********************************** END:  **********************************/
 
-/********************************* BEGIN: class rateNode *********************************/
-
-
+/********************************* BEGIN: class sRateNode *********************************/
 // 计算rateNode所属的子块下标x y和bid
-void setSubBlockIdx(rateNode &node)
+void setSubBlockIdx(sRateNode &node)
 {
 	node.subBlockIdxX = node.u / subBlockLen;
 	node.subBlockIdxY = node.i / subBlockLen;
 	node.bid = node.subBlockIdxX*subBlockLen + node.subBlockIdxY;
 }
 
-
-void setLabel(rateNode &node)
+void setLabel(sRateNode &node)
 {
 	int u = node.u;
 	int i = node.i;
@@ -51,106 +48,81 @@ void setLabel(rateNode &node)
 	int deltaJ = i - subBlockIdxY * subBlockLen;
 	node.label = (subBlockLen - deltaI + deltaJ) % subBlockLen;
 }
+/********************************** END: class sRateNode **********************************/
 
-/********************************** END: class rateNode **********************************/
 
-
-/********************************* BEGIN: class subBlock *********************************/
-subBlock::subBlock(int blockId, int size, rateNode *nodeArray)
+/********************************* BEGIN: class sSubBlock *********************************/
+// 根据bid设置子块x y坐标
+void setSubBlockIdx(sSubBlock &subBlock)
 {
-	this->bid = blockId;
-	this->rateNum = size;
-
-	if (size == 0 || nodeArray == NULL)
-	{
-		subBlockNodeArray = NULL;
-	}
-	else
-	{
-		subBlockNodeArray = new rateNode[size];
-		for (int i = 0; i < size; ++i)
-		{
-			subBlockNodeArray[i] = nodeArray[i];
-		}
-	}
-
-	labelNumArray = new int[subBlockLen];
-	memset(labelNumArray, 0, subBlockLen*sizeof(int));
-
-	worksegArray = new workseg[subBlockLen];
+	subBlock.subBlockIdxX = (subBlock.bid / subBlockLen) + 1;
+	subBlock.subBlockIdxY = subBlock.bid % subBlockLen;
 }
 
-subBlock::~subBlock()
+// 设置子块包含的非0元素个数
+void setRateNum(sSubBlock &subBlock)
 {
-	if (subBlockNodeArray != NULL)
-	{
-		delete[]subBlockNodeArray;
-	}
-
-	if (labelNumArray != NULL)
-	{
-		delete[]labelNumArray;
-	}
-	if (worksegArray != NULL)
-	{
-		delete[]worksegArray;
-	}
+	subBlock.rateNum = computeSubset(subBlock.subBlockIdxX, subBlock.subBlockIdxY);
 }
 
-void subBlock::setBid()
+// 取消：直接复制指针，不要重复分配空间
+/*
+// 分配子块的node数组空间
+void allocSubBlockNodeArray(sSubBlock &subBlock)
 {
-	this->bid = subBlockIdxX*subBlockLen + subBlockIdxY;
+	subBlock.subBlockNodeArray = new sRateNode[subBlock.rateNum];
 }
-
-int subBlock::getBid()
-{
-	return this->bid;
-}
-
-void subBlock::setSubBlockIdx()
-{
-	this->subBlockIdxX = (bid / subBlockLen) + 1;
-	this->subBlockIdxY = bid % subBlockLen;
-}
-
-void subBlock::getSubBlockIdx(int &x, int &y)
-{
-	x = this->subBlockIdxX;
-	y = this->subBlockIdxY;
-}
+*/
 
 // 对子块内所有rateNode进行label
-void subBlock::labelNodeInSubBlock()
+void labelNodeInSubBlock(sSubBlock &subBlock)
 {
-	for (int i = 0; i < rateNum; ++i)
+	for (int i = 0; i < subBlock.rateNum; ++i)
 	{
-		subBlockNodeArray[i].setLabel();
+		setLabel(subBlock.subBlockNodeArray[i]);
 	}
 }
 
-// 计算子块bid的所有label的seg(bid, label): 子块bid中标有标签label的评价值个数，保存到labelNumArray
-void subBlock::computeSeg()
+
+// 计算子块bid中所有label标签的评价值数目seg(bid, label)，保存到mSeg数组的第bid行
+void computeSeg(int bid)
 {
+	memset(mSeg[bid], 0, subBlockLen * sizeof(int));
+	int rateNum = subBlockArray[bid].rateNum;
 	for (int i = 0; i < rateNum; ++i)
 	{
-		int label = subBlockNodeArray[i].getLabel();
-		++labelNumArray[label];
+		int label = subBlockArray[bid].subBlockNodeArray[i].label;
+		++mSeg[bid][label];
 	}
 }
 
-// TO-DO
+// 利用记录的数组seg得出每个workseg的from和to
 // 计算workseg(bid, label)的from和to，即子块bid中评价值label的起始位置
-void subBlock::computeWorkSeg()
+void computeWorkseg(int bid, int tag)
 {
+	mWorkseg[bid][tag].from = mWorkset[bid].beg;	// 包含tag == 0 的情况
+	for (int i = 0; i <= tag - 1; ++i)
+	{
+		mWorkseg[bid][tag].from += mSeg[bid][i];
+	}
+	mWorkseg[bid][tag].to = mWorkseg[bid][tag].from + mSeg[bid][tag];
 }
 
+// 取消：直接复制指针，不要重复分配空间
+/*
+// 释放子块的动态内存空间
+void destroySubBlock(sSubBlock &subBlock)
+{
+	delete[]subBlock.subBlockNodeArray;
+}
+*/
 /********************************** END: class subBlock **********************************/
 
 
-/********************************* BEGIN: class workset *********************************/
-// 无用的workset成员函数
+/********************************* BEGIN: class sWorkset *********************************/
+// 无用的sWorkset成员函数
 /*
-void workset::setBeg(int subBlockIdxX, int subBlockIdxY)
+void sWorkset::setBeg(int subBlockIdxX, int subBlockIdxY)
 {
 	int beg = 0;
 	for (int j = 0; j <= subBlockIdxY; ++j)
@@ -163,7 +135,7 @@ void workset::setBeg(int subBlockIdxX, int subBlockIdxY)
 	this->beg = beg;
 }
 
-void workset::setEnd(int subBlockIdxX, int subBlockIdxY)
+void sWorkset::setEnd(int subBlockIdxX, int subBlockIdxY)
 {
 	this->end = this->beg + computeSubset(matrixRate, subBlockIdxX, subBlockIdxY, subBlockLen);
 }
@@ -184,34 +156,10 @@ void setWorkset(int bid)
 			beg += matrixSubset[i][j];
 		}
 	}
-	sWorkset[bid].beg = beg;
-	sWorkset[bid].end = beg + matrixSubset[subBlockIdxX][subBlockIdxY];
+	mWorkset[bid].beg = beg;
+	mWorkset[bid].end = beg + matrixSubset[subBlockIdxX][subBlockIdxY];
 }
-
-// 计算子块bid中所有标签的评价值数目，保存到seg数组的第bid行
-void computeSeg(int bid)
-{
-	memset(seg[bid], 0, subBlockLen * sizeof(int));
-	int rateNum = subBlockArray[bid].rateNum;
-	for (int i = 0; i < rateNum; ++i)
-	{
-		int label = subBlockArray[bid].subBlockNodeArray[i].label;
-		++seg[bid][label];
-	}
-}
-
-// 利用记录的数组seg得出每个workseg的from和to
-void setWorkseg(int bid, int tag)
-{
-	sWorkseg[bid][tag].from = sWorkset[bid].beg;	// 包含tag == 0 的情况
-	for (int i = 0; i <= tag - 1; ++i)
-	{
-		sWorkseg[bid][tag].from += seg[bid][i];
-	}
-	sWorkseg[bid][tag].to = sWorkseg[bid][tag].from + seg[bid][tag];
-}
-
-/********************************** END: class workset **********************************/
+/********************************** END: class sWorkset **********************************/
 
 
 // 矩阵m内存分配
@@ -434,11 +382,27 @@ int checkSubBlockBoundary(int bid)
 	}
 }
 
-// 计算子块b_xy的ID，其中子块大小为: subBlockLen * subBlockLen
+// 计算子块x, y对应的bid，其中子块大小为: subBlockLen * subBlockLen
 int computeSubBlockID(int subBlockLen, int subBlockIdxX, int subBlockIdxY)
 {
 	return subBlockIdxX * subBlockLen + subBlockIdxY;
 }
+
+
+// 计算bid对应的子块x,y下标
+void getBlockXY(int bid, int &x, int &y)
+{
+	x = (bid / subBlockLen) + 1;
+	y = bid % subBlockLen;
+}
+
+// 计算Rui所属的子块x,y下标
+void getBlockXY(int u, int i, int &x, int &y)
+{
+	x = u / subBlockLen;
+	y = i / subBlockLen;
+}
+
 
 // 记录子块b_xy的ID: bid到二维数组pattern(s, t) 
 // 子块b_xy 是第s种模式中的第t个子块, 则把computeSubBlockID(z, x, y)的结果放入pattern(s,t)
@@ -449,7 +413,7 @@ void setPattern(int **matrixPattern, int s, int t, int subBlockLen, int x, int y
 
 // 返回：subset(x, y)
 // 子块 b_xy 包含的评价值个数(非零元素)
-int computeSubset(double **m, int subBlockIdxX, int subBlockIdxY, int subBlockLen)
+int computeSubset(int subBlockIdxX, int subBlockIdxY)
 {
 	int bid = computeSubBlockID(subBlockLen, subBlockIdxX, subBlockIdxY);
 	int checkResult = checkSubBlockBoundary(bid);
@@ -468,7 +432,7 @@ int computeSubset(double **m, int subBlockIdxX, int subBlockIdxY, int subBlockLe
 	{
 		for (int j = leftUpIdxCol; j <= min(rightDownIdxCol, N-1); ++j)
 		{
-			if (m[i][j] != 0) // fabs(m[i][j]) > 1e-8
+			if (matrixRate[i][j] != 0) // fabs(m[i][j]) > 1e-8
 			{
 				++cnt;
 			}
@@ -490,23 +454,9 @@ void computeAllSubset()
 			cnt += computeSubset(matrixRate, subBlockIdxX, subBlockIdxY, subBlockLen);
 			matrixSubset[subBlockIdxX][subBlockIdxY] = cnt;
 			*/
-			matrixSubset[subBlockIdxX][subBlockIdxY] = computeSubset(matrixRate, subBlockIdxX, subBlockIdxY, subBlockLen);
+			matrixSubset[subBlockIdxX][subBlockIdxY] = computeSubset(subBlockIdxX, subBlockIdxY);
 		}
 	}
-}
-
-// 计算bid对应的子块x,y下标
-void getBlockXY(int bid, int &x, int &y)
-{
-	x = (bid / subBlockLen) + 1;
-	y = bid % subBlockLen;
-}
-
-// 计算Rui所属的子块x,y下标
-void getBlockXY(int u, int i, int &x, int &y)
-{
-	x = u / subBlockLen;
-	y = i / subBlockLen;
 }
 
 

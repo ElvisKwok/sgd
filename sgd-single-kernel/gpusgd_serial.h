@@ -21,7 +21,7 @@ void initParameter();
 
 
 // 评分矩阵非零元素
-struct rateNode
+struct sRateNode
 {
 	int u;	// userIdx
 	int i;	// itemIdx
@@ -31,59 +31,70 @@ struct rateNode
 	int subBlockIdxY;
 	int label;
 
-	rateNode(){}
-	rateNode(int inputU, int inputI, double inputRate) : u(inputU), i(inputI), rate(inputRate) {}
+	sRateNode(){}
+	sRateNode(int inputU, int inputI, double inputRate) : 
+		u(inputU), i(inputI), rate(inputRate) {}
 };
 
 // 计算rateNode所属的子块下标x y和bid
-void setSubBlockIdx(rateNode &node);
+void setSubBlockIdx(sRateNode &node);
 
 // 计算rateNode的label
-void setLabel(rateNode &node);
+void setLabel(sRateNode &node);
 
 
-// TO-DO: 改为纯数据结构体
 // block子方块
-struct subBlock
+struct sSubBlock
 {
-public:
-	subBlock(int blockId, int size, rateNode *nodeArray = NULL);
-	~subBlock();
-	void setBid();
-	int getBid();
-	void setSubBlockIdx();
-	void getSubBlockIdx(int &x, int &y);
-	void setRateNum(int size) { this->rateNum = size; }
-	int getRateNum() { return this->rateNum; }
-	
-	// 对子块内所有rateNode进行label
-	void labelNodeInSubBlock();
-	// 计算子块bid的所有label的seg(bid, label): 子块bid中标有标签label的评价值个数，保存到labelNumArray
-		void computeSeg();
-	// 计算workseg(bid, label)的from和to，即子块bid中评价值label的起始位置
-	void computeWorkSeg();
-
-
 	int bid;
 	int subBlockIdxX;
 	int subBlockIdxY;
 	int rateNum;
-	rateNode *subBlockNodeArray;
-	int *labelNumArray;
-	workseg *worksegArray;
+	sRateNode *subBlockNodeArray;
+
+	sSubBlock() {}
+	sSubBlock(int blockId, int size, sRateNode *nodeArray = NULL): 
+		bid(blockId), rateNum(size), subBlockNodeArray(nodeArray){}
 };
 
-// TO-DO: 集成到subBlock里面（类似workseg）
-// workset: 记录每个子块b_xy（bid）在评分矩阵R的边界beg, end
-struct workset{
+// 根据bid设置子块x y坐标
+void setSubBlockIdx(sSubBlock &subBlock);
+
+// 设置子块包含的非0元素个数
+void setRateNum(sSubBlock &subBlock);
+
+// 取消：直接复制指针，不要重复分配空间
+/*
+// 分配子块的node数组空间
+void allocSubBlockNodeArray(sSubBlock &subBlock);
+*/
+
+// 对子块内所有rateNode进行label
+void labelNodeInSubBlock();
+
+// 计算子块bid中所有标签的评价值数目，保存到seg数组的第bid行
+void computeSeg(int bid);
+
+// 利用记录的数组seg得出每个workseg的from和to
+// 计算workseg(bid, label)的from和to，即子块bid中评价值label的起始位置
+void computeWorkseg(int bid, int tag);
+
+// 取消：直接复制指针，不要重复分配空间
+/*
+// 释放子块的动态内存空间
+void destroySubBlock(sSubBlock &subBlock);
+*/
+
+// sWorkset: 记录每个子块b_xy（bid）在评分矩阵R的边界beg, end
+struct sWorkset{
 	int beg;
 	int end;
 
 	// 无用的成员函数
 	/*
-	workset() : beg(0), end(0){}
-	workset(int a, int b) : beg(a), end(b) {}
-	workset &operator=(const workset &rhs)
+	sWorkset() : beg(0), end(0){}
+	sWorkset(int a, int b) : beg(a), end(b) {}
+	sWorkset &operator=(const sWorkset &rhs)
 	{
 	// 首先检测等号右边的是否就是左边的对象本，若是本对象本身,则直接返回
 	if (this == &rhs)
@@ -108,24 +119,14 @@ struct workset{
 	*/
 };
 
-
-struct workseg {
-	int from;
-	int to;
-};
-
 // 利用记录的数组matrixSubset得出每个workset的beg和end
 void setWorkset(int bid);
 
-// 计算子块bid中所有标签的评价值数目，保存到seg数组的第bid行
-void computeSeg(int bid);
 
-// 利用记录的数组seg得出每个workseg的from和to
-void setWorkseg(int bid, int tag);
-
-
-
-
+struct sWorkseg {
+	int from;
+	int to;
+};
 
 
 
@@ -163,18 +164,23 @@ int checkSubBlockBoundary(int bid);
 // 计算子块b_xy的ID，其中子块大小为: subBlockLen * subBlockLen
 int computeSubBlockID(int subBlockLen, int x, int y);
 
+// 计算bid对应的子块x,y下标
+void getBlockXY(int bid, int &x, int &y);
+
+// 计算Rui所属的子块x,y下标
+void getBlockXY(int u, int i, int &x, int &y);
+
+
 // 记录子块b_xy的ID: bid到二维数组pattern(s, t) 
 // 子块b_xy 是第s种模式中的第t个子块, 则把computeSubBlockID(z, x, y)的结果放入pattern(s,t)
 void setPattern(int **matrixPattern, int s, int t, int subBlockLen, int x, int y);
 
 // 返回：subset(x, y)
 // 子块 b_xy 包含的评价值个数(非零元素)
-int computeSubset(double **m, int subBlockIdxX, int subBlockIdxY, int subBlockLen);
+int computeSubset(int subBlockIdxX, int subBlockIdxY);
 
-// 计算bid对应的子块x,y下标
-void getBlockXY(int bid, int &x, int &y);
-
-// 计算Rui所属的子块x,y下标
-void getBlockXY(int u, int i, int &x, int &y);
+// 记录所有subset(x, y)到全局二维数组matrixSubset
+// 子块 b_xy 包含的评价值个数(非零元素)
+void computeAllSubset();
 
 #endif
