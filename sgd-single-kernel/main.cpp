@@ -10,6 +10,8 @@
 #include "gpusgd_serial.h"
 #include "basic_func.h"
 
+#include "sgd.h"
+
 using namespace std;
 
 ofstream outfile("result/output.txt");
@@ -362,7 +364,6 @@ void sgdPlusPlus(double dMatrixR[ROW_NUM][COLUMN_NUM], double dMatrixP[ROW_NUM][
 
 
 // test label
-#include<algorithm>
 void label_matrix(int *matrixA, int N)
 {
 	for (int i = 0; i < N; ++i)
@@ -372,6 +373,30 @@ void label_matrix(int *matrixA, int N)
 			*(matrixA + i*N + j) = (N - i + j) % N;
 		}
 	}
+}
+
+
+void callGPU()
+{
+	int size = 20;
+	int *a = new int[size];
+	int *b = new int[size];
+	int *c = new int[size];
+
+	for (int i = 0; i < size; ++i)
+	{
+		a[i] = 1;
+		b[i] = 2;
+	}
+
+	solveByGPU(a, b, c, size);
+
+	
+	printList(c, size);
+	delete[]a;
+	delete[]b;
+	delete[]c;
+	getchar();
 }
 
 
@@ -444,14 +469,16 @@ int main()
 #endif
 
 	#pragma warning(disable:4996)
+#if 0
 	string inputFile = "input.txt";
 	string outputFile = "output.txt";
 	freopen(inputFile.c_str(), "r", stdin);
 	freopen(outputFile.c_str(), "w", stdout);
-
+#endif
 	//randomGenerateMatrix();
 	//computeSubset();
 
+	callGPU();
 
 	fclose(stdout);
 	fclose(stdin);

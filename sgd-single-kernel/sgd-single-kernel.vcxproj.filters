@@ -35,5 +35,13 @@
     <ClInclude Include="parameter.h">
       <Filter>头文件</Filter>
     </ClInclude>
+    <ClInclude Include="sgd.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
+  </ItemGroup>
+  <ItemGroup>
+    <CudaCompile Include="sgd.cu">
+      <Filter>源文件</Filter>
+    </CudaCompile>
   </ItemGroup>
 </Project>

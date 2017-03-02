@@ -1,9 +1,12 @@
 #include "gpusgd_serial.h"
 
 int MAX_ITER;			// 最大迭代次数
-double **matrixRate;	// 评分矩阵 size: M * N
-double **matrixUser;	// size: K * M
-double **matrixItem;	// size: K * N
+double lambda;			// 正则化系数
+double gamma;			// 学习率
+
+typeRate **matrixRate;	// 评分矩阵 size: M * N
+typeRate **matrixUser;	// size: M * K
+typeRate **matrixItem;	// size: N * K
 int M;	// matrixRate 行数
 int N;	// matrixRate 列数
 int K;	// 隐含向量维数
@@ -16,7 +19,7 @@ int **matrixPattern;	// size: subBlockNumL * subBlockNumL, 即 模式s * 子块t
 int **matrixSubset;		// size: (subBlockNumL * subBlockNumL)
 
 // 子块bid在评分矩阵中的边界beg和end
-sWorkset *mWorkset;	// size: (subBlockNumL * subBlockNumL)
+sWorkset *worksetArray;	// size: (subBlockNumL * subBlockNumL)
 
 // 子块bid中标有tag标签的评价值数目
 int **mSeg;			// size: (subBlockNumL * subBlockNumL) * subBlockLen, 即 bid*tag
@@ -102,7 +105,7 @@ void computeSeg(int bid)
 // 计算workseg(bid, label)的from和to，即子块bid中评价值label的起始位置
 void computeWorkseg(int bid, int tag)
 {
-	mWorkseg[bid][tag].from = mWorkset[bid].beg;	// 包含tag == 0 的情况
+	mWorkseg[bid][tag].from = worksetArray[bid].beg;	// 包含tag == 0 的情况
 	for (int i = 0; i <= tag - 1; ++i)
 	{
 		mWorkseg[bid][tag].from += mSeg[bid][i];
@@ -200,24 +203,24 @@ void setWorkset(int bid)
 			beg += matrixSubset[i][j];
 		}
 	}
-	mWorkset[bid].beg = beg;
-	mWorkset[bid].end = beg + matrixSubset[subBlockIdxX][subBlockIdxY];
+	worksetArray[bid].beg = beg;
+	worksetArray[bid].end = beg + matrixSubset[subBlockIdxX][subBlockIdxY];
 }
 /********************************** END: class sWorkset **********************************/
 
 
 // 矩阵m内存分配
-void newMatrix(double **m, int rowNum, int colNum)
+void newMatrix(typeRate **m, int rowNum, int colNum)
 {
-	m = new double *[rowNum];
+	m = new typeRate *[rowNum];
 	for (int i = 0; i < rowNum; ++i)
 	{
-		m[i] = new double[colNum];
+		m[i] = new typeRate[colNum];
 	}
 }
 
 // 矩阵m内存销毁
-void deleteMatrix(double **m, int rowNum, int colNum)
+void deleteMatrix(typeRate **m, int rowNum, int colNum)
 {
 	for (int i = 0; i < rowNum; ++i)
 	{
@@ -227,13 +230,13 @@ void deleteMatrix(double **m, int rowNum, int colNum)
 }
 
 // 随机初始化矩阵(0~1)
-void randomInitMatrix(double **m, int rowNum, int colNum)
+void randomInitMatrix(typeRate **m, int rowNum, int colNum)
 {
 	for (int i = 0; i < rowNum; ++i)
 	{
 		for (int j = 0; j < colNum; ++j)
 		{
-			m[i][j] = (rand() % RAND_MAX) / (double)(RAND_MAX);
+			m[i][j] = (rand() % RAND_MAX) / (typeRate)(RAND_MAX);
 		}
 	}
 }
@@ -241,7 +244,7 @@ void randomInitMatrix(double **m, int rowNum, int colNum)
 
 /********************************* BEGIN: shuffle matrix *********************************/
 // 矩阵行shuffle
-void rowShuffle(double **a, int rowNum, int colNum)
+void rowShuffle(typeRate **a, int rowNum, int colNum)
 {
 	cout << "rowShuffle called: " << endl;
 
@@ -275,7 +278,7 @@ void rowShuffle(double **a, int rowNum, int colNum)
 }
 
 // 矩阵的行/列 shuffle (调用rowShuffle)
-void randomShuffleMatrix(double **m, int rowNum, int columnNum)
+void randomShuffleMatrix(typeRate **m, int rowNum, int columnNum)
 {
 	cout << "randomShuffleMatrix called: " << endl;
 
@@ -296,7 +299,7 @@ void randomShuffleMatrix(double **m, int rowNum, int columnNum)
 }
 
 // 矩阵分块，并统计每块包含的元素个数
-int blockMatrix(double **a, int rowNums, int blockLen)
+int blockMatrix(typeRate **a, int rowNums, int blockLen)
 {
 	cout << "blockMatrix called:" << endl;
 	const int blockSize = blockLen;	// element_num_per_block = blockSize * blockSize;
@@ -352,11 +355,11 @@ void randomGenerateMatrix()
 {
 	srand((unsigned)time(NULL));
 	const int MAX = 1000;	// element_num_all = MAX * MAX;
-	double **a = new double*[MAX];
+	typeRate **a = new typeRate*[MAX];
 	int nnz = 0;
 	for (int i = 0; i < MAX; ++i)
 	{
-		a[i] = new double[MAX];
+		a[i] = new typeRate[MAX];
 		for (int j = 0; j < MAX; ++j)
 		{
 			if (rand() % 100 == 0)

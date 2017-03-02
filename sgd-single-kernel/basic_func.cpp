@@ -1,7 +1,8 @@
 #include "basic_func.h"
+#include "parameter.h"
 
 
-void readMatrix(double **m)
+void readMatrix(typeRate **m)
 {
 	int row, column;
 	cin >> row >> column;
@@ -28,7 +29,7 @@ void printList(int *a, int len)
 }
 
 
-void printMatrix(double **m, int rowNum, int colNum)
+void printMatrix(typeRate **m, int rowNum, int colNum)
 {
 	for (int i = 0; i < rowNum; ++i)
 	{
@@ -42,7 +43,7 @@ void printMatrix(double **m, int rowNum, int colNum)
 }
 
 
-void transposeMatrix(double **m, int row, int column)
+void transposeMatrix(typeRate **m, int row, int column)
 {
 	cout << "transposeMatrix called:" << endl;
 	for (int i = 0; i < row; ++i)

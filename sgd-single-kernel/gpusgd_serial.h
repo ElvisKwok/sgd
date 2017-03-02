@@ -13,6 +13,7 @@
 
 
 #include "basic_func.h"
+#include "parameter.h"
 using namespace std;
 
 
@@ -25,14 +26,14 @@ struct sRateNode
 {
 	int u;	// userIdx
 	int i;	// itemIdx
-	double rate;
+	typeRate rate;
 	int bid;
 	int subBlockIdxX;
 	int subBlockIdxY;
 	int label;
 
 	sRateNode(){}
-	sRateNode(int inputU, int inputI, double inputRate) : 
+	sRateNode(int inputU, int inputI, typeRate inputRate) :
 		u(inputU), i(inputI), rate(inputRate) {}
 };
 
@@ -148,23 +149,23 @@ struct sWorkseg {
 
 
 // 矩阵m内存分配
-void newMatrix(double **m, int rowNum, int colNum);
+void newMatrix(typeRate **m, int rowNum, int colNum);
 
 // 矩阵m内存销毁
-void deleteMatrix(double **m, int rowNum, int colNum);
+void deleteMatrix(typeRate **m, int rowNum, int colNum);
 
 // 随机初始化矩阵
-void randomInitMatrix(double **m, int rowNum, int colNum);
+void randomInitMatrix(typeRate **m, int rowNum, int colNum);
 
 
 // 矩阵行shuffle
-void rowShuffle(double **a, int rowNum, int colNum);
+void rowShuffle(typeRate **a, int rowNum, int colNum);
 
 // 矩阵的行/列 shuffle (调用rowShuffle)
-void randomShuffleMatrix(double **m, int rowNum, int columnNum);
+void randomShuffleMatrix(typeRate **m, int rowNum, int columnNum);
 
 // 矩阵分块，并统计每块包含的元素个数
-int blockMatrix(double **a, int rowNums, int blockLen);
+int blockMatrix(typeRate **a, int rowNums, int blockLen);
 
 // test shuffle
 void randomGenerateMatrix();
