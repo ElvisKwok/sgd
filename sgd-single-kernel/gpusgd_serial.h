@@ -81,7 +81,20 @@ void computeSeg(int bid);
 void computeWorkseg(int bid, int tag);
 
 // 设置子块所属的pattern
-void setPattern(sSubBlock &subBlock);
+void setSubBlockPattern(sSubBlock &subBlock);
+
+// 计算所有子块的pattern到二维数组pattern
+void setAllPattern();
+
+// sort比较谓语pred
+bool compare_label(sRateNode a, sRateNode b);
+
+// 根据label对子块内所有rateNode进行排序
+void sortLabelInSubBlock(sSubBlock &subBlock);
+
+// 调用sortLabelInSubBlock，对所有子块进行label排序
+void sortLabelAll();
+
 
 // 取消：直接复制指针，不要重复分配空间
 /*

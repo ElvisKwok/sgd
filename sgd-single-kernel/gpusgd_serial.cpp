@@ -1,5 +1,6 @@
 #include "gpusgd_serial.h"
 
+int MAX_ITER;			// 最大迭代次数
 double **matrixRate;	// 评分矩阵 size: M * N
 double **matrixUser;	// size: K * M
 double **matrixItem;	// size: K * N
@@ -7,7 +8,9 @@ int M;	// matrixRate 行数
 int N;	// matrixRate 列数
 int K;	// 隐含向量维数
 int subBlockNumL = 64;	// subBlockNumL * subBlockNumL个子块
+int subBlockNum = subBlockNumL * subBlockNumL;	// 子块总数目
 int subBlockLen = max(M, N) / subBlockNumL;	// 子块大小为 subBlockLen * subBlockLen
+int subBlockNodeNum = subBlockLen * subBlockLen; // 子块大小size（包含0与非0）
 
 int **matrixPattern;	// size: subBlockNumL * subBlockNumL, 即 模式s * 子块t 
 int **matrixSubset;		// size: (subBlockNumL * subBlockNumL)
@@ -108,12 +111,46 @@ void computeWorkseg(int bid, int tag)
 }
 
 // 设置子块所属的pattern
-void setPattern(sSubBlock &subBlock)
+void setSubBlockPattern(sSubBlock &subBlock)
 {
 	int x = subBlock.subBlockIdxX;
 	int y = subBlock.subBlockIdxY;
 	subBlock.pattern = (subBlockNumL - x + y) % subBlockNumL;
 }
+
+// 计算所有子块的pattern到二维数组pattern
+void setAllPattern()
+{
+	vector<int> cnt(subBlockNumL, 0);
+	for (int i = 0; i < subBlockNum; ++i)
+	{
+		int pattern = subBlockArray[i].pattern;
+		int t = cnt[pattern]++;		// 第s模式的第t个子块
+		int bid = subBlockArray[i].bid;
+		setPattern(pattern, t, bid);
+	}
+}
+
+bool compare_label(sRateNode a, sRateNode b)
+{
+	return a.label < b.label;
+}
+
+// 根据label对子块内所有rateNode进行排序
+void sortLabelInSubBlock(sSubBlock &subBlock)
+{
+	sort(subBlock.subBlockNodeArray, subBlock.subBlockNodeArray + subBlock.rateNum, compare_label);
+}
+
+// 调用sortLabelInSubBlock，对所有子块进行label排序
+void sortLabelAll()
+{
+	for (int i = 0; i < subBlockNum; ++i)
+	{
+		sortLabelInSubBlock(subBlockArray[i]);
+	}
+}
+
 
 // 取消：直接复制指针，不要重复分配空间
 /*
