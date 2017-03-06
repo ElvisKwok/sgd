@@ -16,9 +16,70 @@
 #include "parameter.h"
 using namespace std;
 
+// debug
+template <typename T>
+void printVar(string varName, const T &var)
+{
+	cout << varName << ": \t" << var << endl;
+}
+inline void printLine() { cout << "#######################################" << endl; }
+void unitTest();
+
+// 读取输入文件：
+// M, N
+// (user, item, rate)
+void readFile(string fileName = "input.txt");
+
+// 输出训练模型
+void writeFile(string fileName = "model.txt");
+
+// 输出预测结果
+void writeFile(typeRate *result, string fileName = "predict_result.txt");
 
 // TO-DO
 void initParameter();
+void initBlockDimension();
+
+// sWorkset: 记录每个子块b_xy（bid）在评分矩阵R的边界beg, end
+struct sWorkset{
+	int beg;
+	int end;
+
+	// 无用的成员函数
+	/*
+	sWorkset() : beg(0), end(0){}
+	sWorkset(int a, int b) : beg(a), end(b) {}
+	sWorkset &operator=(const sWorkset &rhs)
+	{
+	// 首先检测等号右边的是否就是左边的对象本，若是本对象本身,则直接返回
+	if (this == &rhs)
+	{
+	return *this;
+	}
+
+	// 复制等号右边的成员到左边的对象中
+	this->beg = rhs.beg;
+	this->end = rhs.end;
+
+	// 把等号左边的对象再次传出
+	// 目的是为了支持连等 eg:    a=b=c 系统首先运行 b=c
+	// 然后运行 a= ( b=c的返回值,这里应该是复制c值后的b对象)
+	return *this;
+	}
+	void print(){ cout << beg << "\t" << end << endl; }
+	void setBeg(int subBlockIdxX, int subBlockIdxY);
+	void setEnd(int subBlockIdxX, int subBlockIdxY);
+
+	void setFromInput(int a, int b) { beg = a; end = b; }
+	*/
+};
+
+
+// sWorkseg: 记录子块bid中每个评价值组tag的边界from和to
+struct sWorkseg {
+	int from;
+	int to;
+};
 
 
 // 评分矩阵非零元素
@@ -103,48 +164,9 @@ void sortLabelAll();
 void destroySubBlock(sSubBlock &subBlock);
 */
 
-// sWorkset: 记录每个子块b_xy（bid）在评分矩阵R的边界beg, end
-struct sWorkset{
-	int beg;
-	int end;
-
-	// 无用的成员函数
-	/*
-	sWorkset() : beg(0), end(0){}
-	sWorkset(int a, int b) : beg(a), end(b) {}
-	sWorkset &operator=(const sWorkset &rhs)
-	{
-	// 首先检测等号右边的是否就是左边的对象本，若是本对象本身,则直接返回
-	if (this == &rhs)
-	{
-	return *this;
-	}
-
-	// 复制等号右边的成员到左边的对象中
-	this->beg = rhs.beg;
-	this->end = rhs.end;
-
-	// 把等号左边的对象再次传出
-	// 目的是为了支持连等 eg:    a=b=c 系统首先运行 b=c
-	// 然后运行 a= ( b=c的返回值,这里应该是复制c值后的b对象)
-	return *this;
-	}
-	void print(){ cout << beg << "\t" << end << endl; }
-	void setBeg(int subBlockIdxX, int subBlockIdxY);
-	void setEnd(int subBlockIdxX, int subBlockIdxY);
-
-	void setFromInput(int a, int b) { beg = a; end = b; }
-	*/
-};
-
 // 利用记录的数组matrixSubset得出每个workset的beg和end
 void setWorkset(int bid);
 
-
-struct sWorkseg {
-	int from;
-	int to;
-};
 
 
 
@@ -204,5 +226,12 @@ int computeSubset(int subBlockIdxX, int subBlockIdxY);
 // 记录所有subset(x, y)到全局二维数组matrixSubset
 // 子块 b_xy 包含的评价值个数(非零元素)
 void computeAllSubset();
+
+
+
+
+
+// 总执行函数
+void execute();
 
 #endif

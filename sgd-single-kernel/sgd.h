@@ -12,7 +12,7 @@
 #include <algorithm>
 
 #include "gpusgd_serial.h"
-
+#include "parameter.h"
 
 using namespace std;
 

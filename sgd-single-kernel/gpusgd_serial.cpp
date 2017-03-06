@@ -1,39 +1,159 @@
 #include "gpusgd_serial.h"
 
-int MAX_ITER;			// 最大迭代次数
-double lambda;			// 正则化系数
-double gamma;			// 学习率
+string parameterFile = "parameter.txt";
+string inputFile = "input.txt";
+string resultFile = "predict_result.txt";
+string modelFile = "model.txt";
 
-typeRate **matrixRate;	// 评分矩阵 size: M * N
-typeRate **matrixUser;	// size: M * K
-typeRate **matrixItem;	// size: N * K
-int M;	// matrixRate 行数
-int N;	// matrixRate 列数
-int K;	// 隐含向量维数
-int subBlockNumL = 64;	// subBlockNumL * subBlockNumL个子块
-int subBlockNum = subBlockNumL * subBlockNumL;	// 子块总数目
-int subBlockLen = max(M, N) / subBlockNumL;	// 子块大小为 subBlockLen * subBlockLen
-int subBlockNodeNum = subBlockLen * subBlockLen; // 子块大小size（包含0与非0）
+int MAX_ITER;				// 最大迭代次数
+double lambda;				// 正则化系数
+double gamma;				// 学习率
+int K;						// 隐含向量维数
+int subBlockNumL = 64;		// subBlockNumL * subBlockNumL个子块
+int threads_per_block;		// 一个block包含的线程数
 
-int **matrixPattern;	// size: subBlockNumL * subBlockNumL, 即 模式s * 子块t 
-int **matrixSubset;		// size: (subBlockNumL * subBlockNumL)
+typeRate **matrixRate;		// 评分矩阵 size: M * N
+typeRate **matrixUser;		// size: M * K
+typeRate **matrixItem;		// size: N * K
+int M;						// matrixRate 行数
+int N;						// matrixRate 列数
+int subBlockNum = subBlockNumL * subBlockNumL;		// 子块总数目
+int subBlockLen = max(M, N) / subBlockNumL;			// 子块大小为 subBlockLen * subBlockLen
+int subBlockNodeNum = subBlockLen * subBlockLen;	// 子块大小size（包含0与非0）
+
+int NNZ;					// 非零元素个数
+
+int **matrixPattern;		// size: subBlockNumL * subBlockNumL, 即 模式s * 子块t 
+int **matrixSubset;			// size: (subBlockNumL * subBlockNumL)
 
 // 子块bid在评分矩阵中的边界beg和end
-sWorkset *worksetArray;	// size: (subBlockNumL * subBlockNumL)
+sWorkset *worksetArray;		// size: (subBlockNumL * subBlockNumL)
 
 // 子块bid中标有tag标签的评价值数目
-int **mSeg;			// size: (subBlockNumL * subBlockNumL) * subBlockLen, 即 bid*tag
+int **mSeg;					// size: (subBlockNumL * subBlockNumL) * subBlockLen, 即 bid*tag
 
 // 子块bid中每个评价值组tag的边界from和to
-sWorkseg **mWorkseg;	// size: (subBlockNumL * subBlockNumL) * subBlockLen, 即 bid*tag
+sWorkseg **mWorkseg;		// size: (subBlockNumL * subBlockNumL) * subBlockLen, 即 bid*tag
 
+
+vector<sRateNode> rateNodeVector;
 sRateNode *rateNodeArray;
 sSubBlock *subBlockArray;	// size: subBlockNumL * subBlockNumL个子块
 
 
 
-/********************************* BEGIN:  *********************************/
-/********************************** END:  **********************************/
+/********************************* BEGIN:  File Process *********************************/
+// 读取输入文件：
+// M, N
+// (user, item, rate)
+void readFile(string fileName)
+{
+	NNZ = 0;
+	ifstream inputFile(fileName);
+
+	inputFile >> M >> N;
+	initBlockDimension();
+
+	while (!inputFile.eof())
+	{
+		++NNZ;
+		int userIdx;
+		int itemIdx;
+		typeRate rate;
+		inputFile >> userIdx >> itemIdx >> rate;
+		sRateNode node(userIdx, itemIdx, rate);
+		setSubBlockIdx(node);
+		setLabel(node);
+
+		rateNodeVector.push_back(node);
+	}
+	rateNodeArray = &rateNodeVector[0];
+}
+
+
+// debug:
+void printRateNode(sRateNode &node)
+{
+	printVar("node.u", node.u);
+	printVar("node.i", node.i);
+	printVar("node.rate", node.rate);
+	printVar("node.bid ", node.bid);
+	printVar("node.subBlockIdxX", node.subBlockIdxX);
+	printVar("node.subBlockIdxY ", node.subBlockIdxY);
+	printVar("node.label", node.label);
+
+}
+
+// debug:
+void unitTest()
+{
+	readFile(inputFile);
+	for (int i = 0; i < rateNodeVector.size(); ++i)
+	{
+		printRateNode(rateNodeArray[i]);
+		printLine();
+	}
+}
+
+// 输出训练模型
+void writeFile(string fileName)
+{
+}
+
+// 输出预测结果
+void writeFile(typeRate *result, string fileName)
+{
+
+}
+
+// 根据参数文件设定，初始化参数
+void initParameter()
+{
+	cout << "reading parameters from parameters.txt..." << endl;
+
+	#pragma warning(disable:4996)
+	freopen(parameterFile.c_str(), "r", stdin);
+
+	scanf("MAX_ITER = %d\n", &MAX_ITER);
+	scanf("lambda = %f\n", &lambda);
+	scanf("gamma = %f\n", &gamma);
+	scanf("K = %d\n", &K);
+	scanf("subBlockNumL = %d\n", &subBlockNumL);
+	scanf("threads_per_block = %d\n", &threads_per_block);
+
+	fclose(stdin);
+	freopen("CON", "r", stdin);   //"CON"代表控制台
+
+	/*
+	// test
+	cout << "MAX_ITER = " << MAX_ITER << endl;
+	cout << "lambda = " << lambda << endl;
+	cout << "gamma = " << gamma << endl;
+	cout << "K = " << K << endl;
+	cout << "subBlockNumL = " << subBlockNumL << endl;
+	cout << "threads_per_block = " << threads_per_block << endl;
+	cout << endl;
+	*/
+
+	getchar();
+}
+
+void initBlockDimension()
+{
+	// 根据输入的M, N 初试化参数
+	subBlockNum = subBlockNumL * subBlockNumL;		// 子块总数目
+	subBlockLen = max(M, N) / subBlockNumL;			// 子块大小为 subBlockLen * subBlockLen
+	subBlockNodeNum = subBlockLen * subBlockLen;	// 子块大小size（包含0与非0）
+
+	// debug:
+	printVar("subBlockNum", subBlockNum);
+	printVar("subBlockLen", subBlockLen);
+	printVar("subBlockNodeNum", subBlockNodeNum);
+	printLine();
+}
+
+
+/********************************** END:  File Process **********************************/
 
 /********************************* BEGIN: class sRateNode *********************************/
 // 计算rateNode所属的子块下标x y和bid
@@ -537,3 +657,23 @@ void labelSubBlock(int subBlockIdxX, int subBlockIdxY)
 	}
 }
 */
+
+
+
+
+
+// 总执行函数
+void execute()
+{
+	// 初试化、输入
+	readFile(inputFile); // 评分矩阵
+
+	// CPU处理
+	
+	// 调用GPU程序
+
+	// 保存结果 (model)
+
+	// 如果执行方式为：预测
+	// 预测并保存结果
+}
