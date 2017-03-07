@@ -14,6 +14,7 @@
 
 #include "basic_func.h"
 #include "parameter.h"
+#include "parallelReadFile.h"
 using namespace std;
 
 // debug

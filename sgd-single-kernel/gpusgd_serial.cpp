@@ -52,14 +52,14 @@ sSubBlock *subBlockArray;	// size: subBlockNumL * subBlockNumL¸ö×Ó¿é
 // (user, item, rate)
 void readFile(string fileName)
 {
-	NNZ = 0;
-	ifstream inputFile(fileName);
-
 	initBlockDimension();
+
+	// serial read
+	/*
+	ifstream inputFile(fileName);
 
 	while (!inputFile.eof())
 	{
-		++NNZ;
 		int userIdx;
 		int itemIdx;
 		typeRate rate;
@@ -70,6 +70,12 @@ void readFile(string fileName)
 
 		rateNodeVector.push_back(node);
 	}
+	*/
+
+	// parallel read
+	parallelReadFile(fileName, rateNodeVector);
+
+	NNZ = rateNodeVector.size();
 	rateNodeArray = &rateNodeVector[0];
 }
 

@@ -41,6 +41,9 @@
     <ClInclude Include="sgd.h">
       <Filter>头文件</Filter>
     </ClInclude>
+    <ClInclude Include="parallelReadFile.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <CudaCompile Include="sgd.cu">
