@@ -55,7 +55,6 @@ void readFile(string fileName)
 	NNZ = 0;
 	ifstream inputFile(fileName);
 
-	inputFile >> M >> N;
 	initBlockDimension();
 
 	while (!inputFile.eof())
@@ -90,6 +89,7 @@ void printRateNode(sRateNode &node)
 // debug:
 void unitTest()
 {
+	initParameter();
 	readFile(inputFile);
 	sortRateNodeArrayBid();
 	for (int i = 0; i < rateNodeVector.size(); ++i)
@@ -141,12 +141,13 @@ void initParameter()
 {
 	cout << "reading parameters from parameters.txt..." << endl;
 
-	#pragma warning(disable:4996)
 	freopen(parameterFile.c_str(), "r", stdin);
 
 	scanf("MAX_ITER = %d\n", &MAX_ITER);
-	scanf("lambda = %f\n", &lambda);
-	scanf("gamma = %f\n", &gamma);
+	scanf("lambda = %lf\n", &lambda);
+	scanf("gamma = %lf\n", &gamma);
+	scanf("M = %d\n", &M);
+	scanf("N = %d\n", &N);
 	scanf("K = %d\n", &K);
 	scanf("subBlockNumL = %d\n", &subBlockNumL);
 	scanf("threads_per_block = %d\n", &threads_per_block);
@@ -154,18 +155,20 @@ void initParameter()
 	fclose(stdin);
 	freopen("CON", "r", stdin);   //"CON"代表控制台
 
-	/*
+	///*
 	// test
 	cout << "MAX_ITER = " << MAX_ITER << endl;
 	cout << "lambda = " << lambda << endl;
 	cout << "gamma = " << gamma << endl;
+	cout << "M = " << M << endl;
+	cout << "N = " << N << endl;
 	cout << "K = " << K << endl;
 	cout << "subBlockNumL = " << subBlockNumL << endl;
 	cout << "threads_per_block = " << threads_per_block << endl;
 	cout << endl;
-	*/
+	//*/
 
-	getchar();
+	//getchar();
 }
 
 // 根据输入的M, N 初试化subBlock维度参数

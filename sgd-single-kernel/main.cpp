@@ -54,7 +54,6 @@ void callGPU()
 
 void test()
 {
-	#pragma warning(disable:4996)
 	string outputFile = "console_output.txt";
 	freopen(outputFile.c_str(), "w", stdout);
 	unitTest();
@@ -93,7 +92,7 @@ int main()
 	}
 #endif
 
-	#pragma warning(disable:4996)
+	
 #if 0
 	string inputFile = "input.txt";
 	string outputFile = "output.txt";
