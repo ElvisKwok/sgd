@@ -16,6 +16,7 @@
 #include "parameter.h"
 #include "parallelReadFile.h"
 using namespace std;
+using std::cout;
 
 // debug
 template <typename T>
@@ -43,6 +44,10 @@ void initParameter();
 
 // 根据输入的M, N 初试化subBlock维度参数
 void initBlockDimension();
+
+// 初始化所有数据（指针）并分配空间，调用newArray, newMatrix
+void initAllData();
+
 
 // sWorkset: 记录每个子块b_xy（bid）在评分矩阵R的边界beg, end
 struct sWorkset{
@@ -215,12 +220,13 @@ void setWorkseg();
 
 
 // TO-DO
-// 数组array内存分配
+// 数组array内存分配, 并初始化为val
 template <typename T>
-void newArray(T *array, int n);
+void newArray(T * &array, int n, int val);
 
-// 矩阵m内存分配
-void newMatrix(typeRate **m, int rowNum, int colNum);
+// 矩阵m内存分配, 并初始化为val
+template <typename T>
+void newMatrix(T ** &m, int rowNum, int colNum, int val);
 
 // 矩阵m内存销毁
 void deleteMatrix(typeRate **m, int rowNum, int colNum);
@@ -229,9 +235,23 @@ void deleteMatrix(typeRate **m, int rowNum, int colNum);
 void randomInitMatrix(typeRate **m, int rowNum, int colNum);
 
 
-// 矩阵行shuffle
-void rowShuffle(typeRate **a, int rowNum, int colNum);
 
+// 输出子块nnz的max_diff
+int getMaxDiff();
+
+// 输出子块均匀度
+double getEvenness();
+
+// 矩阵行shuffle NNZ版本(基于任意顺序的rateNodeArray)
+// note: 要保存perm，用于复原, permRow大小为M, 初始化为{0, 1, ..., M-1}
+void rowShuffle(vector<int> &permRow);
+
+// 矩阵列shuffle NNZ版本(基于任意顺序的rateNodeArray)
+// note: 要保存perm，用于复原, permRow大小为M, 初始化为{0, 1, ..., M-1}
+void columnShuffle(vector<int> &permColumn);
+
+// DELETE: 矩阵shuffle原始版(随机生成矩阵的函数可以用下)
+/*
 // 矩阵的行/列 shuffle (调用rowShuffle)
 void randomShuffleMatrix(typeRate **m, int rowNum, int columnNum);
 
@@ -240,7 +260,7 @@ int blockMatrix(typeRate **a, int rowNums, int blockLen);
 
 // test shuffle
 void randomGenerateMatrix();
-
+*/
 
 
 // DELETE

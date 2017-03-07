@@ -128,6 +128,8 @@ int parallelReadFile(std::string &graphpath, std::vector<sRateNode> &edges)
 		std::cerr << "unmap(2): " << GetLastError();
 	CloseHandle(hd);
 	CloseHandle(handle);
+	printLine();
+
 	//getchar();
 	return 0;
 }
