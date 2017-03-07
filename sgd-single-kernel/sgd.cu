@@ -114,6 +114,7 @@ __global__ void sgd_kernel(
 	}
 	int bid = d_matrixPattern[s][bidx];
 	
+	// c++风格 end为下一个位置
 	if (d_worksetArray[bid].beg == d_worksetArray[bid].end)
 	{
 		return;
@@ -123,6 +124,8 @@ __global__ void sgd_kernel(
 	{
 		int from = d_mWorkseg[bid][tag].from;
 		int to = d_mWorkseg[bid][tag].to;
+		// QUESTION: tid从0开始？
+		// c++风格 end为下一个位置
 		for (int iRate = from + tid; iRate < to; iRate += blockDim.x)	// iRate为 属于子块bid && 标签为tag 的评价值 在rateNodeArray数组的下标
 		{
 			typeRate rate = rateNodeArray[iRate].rate;

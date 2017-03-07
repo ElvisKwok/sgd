@@ -34,10 +34,13 @@ void readFile(string fileName = "input.txt");
 void writeFile(string fileName = "model.txt");
 
 // 输出预测结果
-void writeFile(typeRate *result, string fileName = "predict_result.txt");
+// resultArray按user_item的输出顺序
+void writeFile(typeRate *result, int predictNum, string fileName = "predict_result.txt");
 
-// TO-DO
+// 初始化参数
 void initParameter();
+
+// 根据输入的M, N 初试化subBlock维度参数
 void initBlockDimension();
 
 // sWorkset: 记录每个子块b_xy（bid）在评分矩阵R的边界beg, end
@@ -104,6 +107,11 @@ void setSubBlockIdx(sRateNode &node);
 // 计算rateNode的label
 void setLabel(sRateNode &node);
 
+// sort比较谓语pred: 先按bid排序，bid相同按label排序
+bool compare_bid_label(sRateNode a, sRateNode b);
+
+// 根据bid将rateNodeArray数组排序
+void sortRateNodeArrayBid();
 
 // block子方块
 struct sSubBlock
@@ -120,34 +128,60 @@ struct sSubBlock
 		bid(blockId), rateNum(size), subBlockNodeArray(nodeArray){}
 };
 
+// DELETE
+// setSubBlockIdx()
+// setRateNum() 
+// allocSubBlockNodeArray() 
+// labelNodeInSubBlock()
+/*
 // 根据bid设置子块x y坐标
 void setSubBlockIdx(sSubBlock &subBlock);
 
 // 设置子块包含的非0元素个数
 void setRateNum(sSubBlock &subBlock);
 
+
 // 取消：直接复制指针，不要重复分配空间
-/*
+// DELETE
 // 分配子块的node数组空间
-void allocSubBlockNodeArray(sSubBlock &subBlock);
-*/
+//void allocSubBlockNodeArray(sSubBlock &subBlock);
+
 
 // 对子块内所有rateNode进行label
 void labelNodeInSubBlock(sSubBlock &subBlock);
+*/
 
+
+
+
+// DELETE
+// workseg计算
+/*
 // 计算子块bid中所有标签的评价值数目，保存到seg数组的第bid行
 void computeSeg(int bid);
 
 // 利用记录的数组seg得出每个workseg的from和to
 // 计算workseg(bid, label)的from和to，即子块bid中评价值label的起始位置
 void computeWorkseg(int bid, int tag);
+*/
 
+// 计算所有子块的pattern到二维数组pattern
+void setAllPattern();
+
+// DELETE
+// 计算pattern
+/*
 // 设置子块所属的pattern
 void setSubBlockPattern(sSubBlock &subBlock);
 
 // 计算所有子块的pattern到二维数组pattern
 void setAllPattern();
+*/
 
+
+// DELETE
+// 子块内rateNode排序
+/*
 // sort比较谓语pred
 bool compare_label(sRateNode a, sRateNode b);
 
@@ -156,19 +190,33 @@ void sortLabelInSubBlock(sSubBlock &subBlock);
 
 // 调用sortLabelInSubBlock，对所有子块进行label排序
 void sortLabelAll();
-
+*/
 
 // 取消：直接复制指针，不要重复分配空间
+// DELETE
 /*
 // 释放子块的动态内存空间
 void destroySubBlock(sSubBlock &subBlock);
 */
 
-// 利用记录的数组matrixSubset得出每个workset的beg和end
+// DELETE
+// 利用记录的数组matrixSubset得出单个workset的beg和end
+/*
 void setWorkset(int bid);
+*/
+
+// 扫描bid排序后的rateNodeArray, 得出每个workset的beg和end，保存到worksetArray
+// 同时统计每个subset的值,保存到subsetArray
+void setWorkset();
+
+// 扫描bid_label排序后的rateNodeArray, 得出每个workseg的from和to，保存到mWorkseg
+void setWorkseg();
 
 
-
+// TO-DO
+// 数组array内存分配
+template <typename T>
+void newArray(T *array, int n);
 
 // 矩阵m内存分配
 void newMatrix(typeRate **m, int rowNum, int colNum);
@@ -194,12 +242,15 @@ void randomGenerateMatrix();
 
 
 
+// DELETE
 // 检查子块bid是否越界
+/*
 // 返回值：
 // 0 不越界
 // 1 完全越界
 // 2 部分越界
 int checkSubBlockBoundary(int bid);
+*/
 
 // 计算子块b_xy的ID，其中子块大小为: subBlockLen * subBlockLen
 int computeSubBlockID(int subBlockLen, int x, int y);
@@ -219,6 +270,9 @@ void setPattern(int s, int t, int x, int y);
 // 子块bid是第s种模式中的第t个子块, 则把bid放入pattern(s,t)
 void setPattern(int s, int t, int bid);
 
+// DELETE
+// 原subset矩阵的计算
+/*
 // 返回：subset(x, y)
 // 子块 b_xy 包含的评价值个数(非零元素)
 int computeSubset(int subBlockIdxX, int subBlockIdxY);
@@ -226,7 +280,7 @@ int computeSubset(int subBlockIdxX, int subBlockIdxY);
 // 记录所有subset(x, y)到全局二维数组matrixSubset
 // 子块 b_xy 包含的评价值个数(非零元素)
 void computeAllSubset();
-
+*/
 
 
 
