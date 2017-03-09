@@ -10,13 +10,25 @@
 #include <string>
 #include <vector>
 #include <algorithm>
-
+#include <chrono>   
 
 #include "basic_func.h"
 #include "parameter.h"
 #include "parallelReadFile.h"
 using namespace std;
 using std::cout;
+
+using namespace chrono;
+
+// CALL_FUN_TIME(test(10))
+#define CALL_FUN_TIME(FUN) \
+{ \
+	auto start = system_clock::now(); \
+	(FUN); \
+	auto end = system_clock::now(); \
+	auto duration = duration_cast<microseconds>(end - start); \
+	cout << "it takes " << double(duration.count()) * microseconds::period::num / microseconds::period::den << " seconds" << endl; \
+}
 
 // debug
 template <typename T>
@@ -112,6 +124,12 @@ void setSubBlockIdx(sRateNode &node);
 
 // 计算rateNode的label
 void setLabel(sRateNode &node);
+
+// 矩阵变换后要重新计算bid(变换中)
+void resetAllNode_blockIdx();
+
+// 矩阵变换后要重新计算bid和label（final）
+void resetAllNode_blockIdx_label();
 
 // sort比较谓语pred: 先按bid排序，bid相同按label排序
 bool compare_bid_label(sRateNode a, sRateNode b);
@@ -228,6 +246,10 @@ void newArray(T * &array, int n, int val);
 template <typename T>
 void newMatrix(T ** &m, int rowNum, int colNum, int val);
 
+// 矩阵m内存分配, 并随机初始化
+template <typename T>
+void newMatrixRandom(T** &m, int rowNum, int colNum);
+
 // 矩阵m内存销毁
 void deleteMatrix(typeRate **m, int rowNum, int colNum);
 
@@ -249,6 +271,9 @@ void rowShuffle(vector<int> &permRow);
 // 矩阵列shuffle NNZ版本(基于任意顺序的rateNodeArray)
 // note: 要保存perm，用于复原, permRow大小为M, 初始化为{0, 1, ..., M-1}
 void columnShuffle(vector<int> &permColumn);
+
+// 矩阵随机变换(最优解)
+void matrixShuffle();
 
 // DELETE: 矩阵shuffle原始版(随机生成矩阵的函数可以用下)
 /*

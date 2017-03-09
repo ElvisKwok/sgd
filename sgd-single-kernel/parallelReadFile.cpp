@@ -84,7 +84,7 @@ int parallelReadFile(std::string &graphpath, std::vector<sRateNode> &edges)
 	if (hd == INVALID_HANDLE_VALUE)
 		cerr << "INVALID_HANDLE_VALUE:" << GetLastError();
 	size_t size = GetFileSize(hd, NULL);
-	cout << "file size:" << size << "kb" << endl;
+	cout << "file size:" << size << "B" << endl;
 	HANDLE handle = CreateFileMapping(hd, NULL, PAGE_READONLY, 0, 0, NULL);
 	//HANDLE handle = CreateFileMapping(hd, NULL, PAGE_EXECUTE_READ, 0, 100, NULL);
 	const char* data = static_cast<char*>(MapViewOfFile(handle, FILE_MAP_READ, 0, 0, 0));
@@ -92,6 +92,7 @@ int parallelReadFile(std::string &graphpath, std::vector<sRateNode> &edges)
 		std::cerr << "map(2): " << GetLastError();
 
 	const int          nthread = omp_get_max_threads();
+	//const size_t       zchunk = 1024 * 64;  // 64KB
 	const size_t       zchunk = 1024 * 1024 * 64;  // 64MiB
 	const size_t       nchunk = size / zchunk + (size % zchunk > 0);
 	std::vector<std::deque<sRateNode>> eparts(nthread);
@@ -129,7 +130,8 @@ int parallelReadFile(std::string &graphpath, std::vector<sRateNode> &edges)
 	CloseHandle(hd);
 	CloseHandle(handle);
 	printLine();
-
+	
 	//getchar();
 	return 0;
+	//exit(0);
 }

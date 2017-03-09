@@ -1,4 +1,6 @@
 #include "sgd.h"
+#define CHECK(res) if(res!=cudaSuccess){exit(-1);} 
+
 
 // unused code
 /*
@@ -157,12 +159,30 @@ void solveByGPU(int *a, int *b, int *c, int size)
 	}
 
 
+	sRateNode *d_rateNodeArray;
+	typeRate **d_matrixUser;
+	typeRate **d_matrixItem;
+	sWorkset *d_worksetArray;
+	sWorkseg **d_mWorkseg;
+	int **d_matrixPattern;
+	int d_s;					// 第s个模式
+	int d_subBlockNum;			// subBlockNumL * subBlockNumL个子块 
+	int d_subBlockLen;		// 子块大小为 subBlockLen * subBlockLen
+	int d_K;						// 隐含向量维数
+	double d_lambda;			// 正则化系数
+	double d_gamma;			// 学习率
+
 	int *dev_a = 0;
 	int *dev_b = 0;
 	int *dev_c = 0;
+	cudaError_t res;
+	res = cudaMalloc((void**)(&dev_a), size*sizeof(int)); CHECK(res)
+
 	cudaMalloc((void**)&dev_a, size * sizeof(int));
 	cudaMalloc((void**)&dev_b, size * sizeof(int));
 	cudaMalloc((void**)&dev_c, size * sizeof(int));
+
+
 	cudaMemcpy(dev_a, a, size * sizeof(int), cudaMemcpyHostToDevice);
 	cudaMemcpy(dev_b, b, size * sizeof(int), cudaMemcpyHostToDevice);
 

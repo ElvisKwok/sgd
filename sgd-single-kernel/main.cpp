@@ -54,7 +54,7 @@ void callGPU()
 
 void test()
 {
-	string outputFile = "console_output.txt";
+	string outputFile = "output/console_output.txt";
 	freopen(outputFile.c_str(), "w", stdout);
 	unitTest();
 	//getchar();
