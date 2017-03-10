@@ -10,8 +10,8 @@ extern double gamma;			// 学习率
 
 
 extern typeRate **matrixRate;	// 评分矩阵 size: M * N
-extern typeRate **matrixUser;	// size: K * M
-extern typeRate **matrixItem;	// size: K * N
+extern typeRate *matrixUser;	// size: K * M
+extern typeRate *matrixItem;	// size: K * N
 extern int M;	// matrixRate 行数
 extern int N;	// matrixRate 列数
 extern int K;	// 隐含向量维数

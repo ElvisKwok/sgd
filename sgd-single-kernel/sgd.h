@@ -16,6 +16,18 @@
 
 using namespace std;
 
-void solveByGPU(int *a, int *b, int *c, int size);
+void solveByGPU(
+	sRateNode *rateNodeArray,
+	typeRate *matrixUser,
+	typeRate *matrixItem,
+	sWorkset *worksetArray,
+	sWorkseg *mWorkseg,
+	int *matrixPattern,
+	int subBlockNumL,			// subBlockNumL * subBlockNumL个子块 
+	int subBlockLen,			// 子块大小为 subBlockLen * subBlockLen
+	double lambda,				// 正则化系数
+	double gamma,				// 学习率
+	int NNZ						// 评价值个数
+	);
 
 #endif

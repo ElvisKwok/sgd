@@ -11,6 +11,7 @@
 #include <vector>
 #include <algorithm>
 #include <chrono>   
+#include <map>
 
 #include "basic_func.h"
 #include "parameter.h"
@@ -27,7 +28,7 @@ using namespace chrono;
 	(FUN); \
 	auto end = system_clock::now(); \
 	auto duration = duration_cast<microseconds>(end - start); \
-	cout << "it takes " << double(duration.count()) * microseconds::period::num / microseconds::period::den << " seconds" << endl; \
+	cout << "it takes " #FUN ": \t\t" << double(duration.count()) * microseconds::period::num / microseconds::period::den << " seconds" << endl; \
 }
 
 // debug
@@ -237,18 +238,18 @@ void setWorkset();
 void setWorkseg();
 
 
-// TO-DO
 // 数组array内存分配, 并初始化为val
 template <typename T>
 void newArray(T * &array, int n, int val);
 
+// DELETE:
 // 矩阵m内存分配, 并初始化为val
 template <typename T>
 void newMatrix(T ** &m, int rowNum, int colNum, int val);
 
-// 矩阵m内存分配, 并随机初始化
+// 1维的矩阵m内存分配, 并随机初始化
 template <typename T>
-void newMatrixRandom(T** &m, int rowNum, int colNum);
+void newMatrixRandom1D(T* &m, int rowNum, int colNum);
 
 // 矩阵m内存销毁
 void deleteMatrix(typeRate **m, int rowNum, int colNum);
@@ -263,6 +264,9 @@ int getMaxDiff();
 
 // 输出子块均匀度
 double getEvenness();
+
+// 在乱序的rateNodeArray计算subsetArray，省下排序时间
+void computeSubsetArray();
 
 // 矩阵行shuffle NNZ版本(基于任意顺序的rateNodeArray)
 // note: 要保存perm，用于复原, permRow大小为M, 初始化为{0, 1, ..., M-1}

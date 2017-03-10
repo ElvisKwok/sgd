@@ -95,7 +95,8 @@ int parallelReadFile(std::string &graphpath, std::vector<sRateNode> &edges)
 	//const size_t       zchunk = 1024 * 64;  // 64KB
 	const size_t       zchunk = 1024 * 1024 * 64;  // 64MiB
 	const size_t       nchunk = size / zchunk + (size % zchunk > 0);
-	std::vector<std::deque<sRateNode>> eparts(nthread);
+	//std::vector<std::deque<sRateNode>> eparts(nthread);	// FIXME: slow clean up
+	std::vector<std::vector<sRateNode>> eparts(nthread);
 #pragma omp parallel for schedule(dynamic, 1) 
 	for (int i = 0; i < nchunk; ++i) {
 		const char* p = data + zchunk * i;

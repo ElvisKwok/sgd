@@ -1,4 +1,5 @@
 #include "gpusgd_serial.h"
+#include "sgd.h"
 
 string parameterFile = "input/parameter.txt";
 //string inputFile = "input/ra.test_awk";
@@ -17,8 +18,9 @@ int threads_per_block;		// 一个block包含的线程数
 
 // DELETE
 typeRate **matrixRate;		// 评分矩阵 size: M * N
-typeRate **matrixUser;		// size: M * K
-typeRate **matrixItem;		// size: N * K
+
+typeRate *matrixUser;		// size: M * K
+typeRate *matrixItem;		// size: N * K
 int M;						// matrixRate 行数
 int N;						// matrixRate 列数
 int subBlockNum;			// 子块总数目, value = subBlockNumL * subBlockNumL
@@ -27,7 +29,7 @@ int subBlockNodeNum;		// 子块大小size（包含0与非0）, value = subBlockLen * subBl
 
 int NNZ;					// 非零元素个数，输入文件(user, item, rate)的行数
 
-int **matrixPattern;		// size: subBlockNumL * subBlockNumL, 即 模式s * 子块t (注意初始化为-1)
+int *matrixPattern;		// size: subBlockNumL * subBlockNumL, 即 模式s * 子块t (注意初始化为-1)
 // DELETE
 int **matrixSubset;			// size: (subBlockNumL * subBlockNumL)
 int *subsetArray;			// 记录每个子块bid的nnz, size: subBlockNum, bid为下标 （用于统计块均与度）
@@ -40,7 +42,7 @@ sWorkset *worksetArray;		// size: subBlockNum
 int **mSeg;					// size: subBlockNum * subBlockLen, 即 bid*tag
 
 // 子块bid中每个评价值组tag的边界from和to
-sWorkseg **mWorkseg;		// size: subBlockNum * subBlockLen, 即 bid*tag
+sWorkseg *mWorkseg;		// size: subBlockNum * subBlockLen, 即 bid*tag
 
 
 vector<sRateNode> rateNodeVector;	// 用于动态读取输入
@@ -109,16 +111,17 @@ void writeFile(string fileName)
 	{
 		for (int k = 0; k < K; ++k)
 		{
-			outFile << matrixUser[i][k] << " ";
+			outFile << *(matrixUser+i*K+k) << " ";
 		}
 		outFile << endl;
 	}
+	outFile << endl;
 
 	for (int i = 0; i < N; ++i)
 	{
 		for (int k = 0; k < K; ++k)
 		{
-			outFile << matrixItem[i][k] << " ";
+			outFile << *(matrixItem + i*K + k) << " ";
 		}
 		outFile << endl;
 	}
@@ -194,24 +197,22 @@ void initAllData()
 	// TO-DO
 
 	// 随机初始化
-	typeRate **matrixUser;		// size: M * K
-	typeRate **matrixItem;		// size: N * K
-	newMatrixRandom(matrixUser, M, K);
-	newMatrixRandom(matrixItem, N, K);
+	//typeRate *matrixUser;		// size: M * K
+	//typeRate *matrixItem;		// size: N * K
+	newMatrixRandom1D(matrixUser, M, K);
+	newMatrixRandom1D(matrixItem, N, K);
 
-	/*
-	// memset(-1)
-	int **matrixPattern;		// size: subBlockNumL * subBlockNumL, 即 模式s * 子块t (注意初始化为-1)
-	*/
+	//int *matrixPattern;		// size: subBlockNumL * subBlockNumL, 即 模式s * 子块t (注意初始化为-1)
+	newArray(matrixPattern, subBlockNum, -1);
 
 	//int *subsetArray;			// 记录每个子块bid的nnz, size: (subBlockNumL * subBlockNumL), bid为下标 （用于统计块均与度）
 	newArray(subsetArray, subBlockNum, 0);
 
 	//sWorkset *worksetArray;		// 子块bid在评分矩阵中的边界beg和end, size: (subBlockNumL * subBlockNumL)
 	newArray(worksetArray, subBlockNum, 0);
-	/*
-	sWorkseg **mWorkseg;		// 子块bid中每个评价值组tag的边界from和to, size: (subBlockNumL * subBlockNumL) * subBlockLen, 即 bid*tag
-	*/
+
+	//sWorkseg *mWorkseg;		// 子块bid中每个评价值组tag的边界from和to, size: (subBlockNumL * subBlockNumL) * subBlockLen, 即 bid*tag
+	newArray(mWorkseg, subBlockNum * subBlockLen, 0);
 
 	// 初始化permRow, permColumn
 	int i;
@@ -272,7 +273,6 @@ void resetAllNode_blockIdx_label()
 		setLabel(rateNodeArray[i]);
 	}
 }
-
 
 
 // sort比较谓语pred
@@ -563,8 +563,11 @@ void setWorkseg()
 			{
 				++i;
 			}
-			mWorkseg[curBid][curLabel].from = from;
-			mWorkseg[curBid][curLabel].to = i;
+			(mWorkseg + curBid*subBlockLen)[curLabel].from = from;		// .的优先级比*高，用*要加括号 (*(*(mWorkseg + curBid*subBlockLen + curLabel))).from
+			(mWorkseg + curBid*subBlockLen)[curLabel].to = i;
+			
+			//mWorkseg[curBid][curLabel].from = from;
+			//mWorkseg[curBid][curLabel].to = i;
 			--i; // for循环有++i
 		}
 	}
@@ -592,17 +595,16 @@ void newMatrix(T** &m, int rowNum, int colNum, int val)
 	}
 }
 
-// 矩阵m内存分配, 并随机初始化
+// 1维的矩阵m内存分配, 并随机初始化
 template <typename T>
-void newMatrixRandom(T** &m, int rowNum, int colNum)
+void newMatrixRandom1D(T* &m, int rowNum, int colNum)
 {
-	m = new T *[rowNum];
+	m = new T[rowNum * colNum];
 	for (int i = 0; i < rowNum; ++i)
 	{
-		m[i] = new T[colNum];
 		for (int j = 0; j < colNum; ++j)
 		{
-			m[i][j] = (rand() % RAND_MAX) / (typeRate)(RAND_MAX);
+			*(m + i * colNum + j) = (rand() % RAND_MAX) / (typeRate)(RAND_MAX);
 		}
 	}
 	
@@ -640,6 +642,7 @@ void randomInitMatrix(typeRate **m, int rowNum, int colNum)
 
 
 /********************************* BEGIN: shuffle matrix *********************************/
+// debug:
 void printNodeArrayAsMatrix()
 {
 	sortRateNodeArrayUserItem();
@@ -659,7 +662,6 @@ void printNodeArrayAsMatrix()
 	}
 }
 
-
 // 输出子块nnz的max_diff
 int getMaxDiff()
 {
@@ -675,6 +677,18 @@ double getEvenness()
 	int max_diff = getMaxDiff();
 	double avg = (double)NNZ / subBlockNum;
 	return (double)avg / (avg + max_diff);
+}
+
+// 在乱序的rateNodeArray计算subsetArray，省下排序时间
+void computeSubsetArray()
+{
+	int curBid;
+	for (int i = 0; i < NNZ; ++i)
+	{
+		setSubBlockIdx(rateNodeArray[i]);
+		curBid = rateNodeArray[i].bid;
+		++subsetArray[curBid];
+	}
 }
 
 // for random_shuffle
@@ -701,8 +715,8 @@ void rowShuffle(vector<int> &permRow)
 #pragma omp parallel for 
 	for (int i = 0; i < NNZ; ++i)
 	{
-		userIdx = rateNodeArray[i].u;
-		rateNodeArray[i].u = permRow[userIdx-1];	// FIXME: 假设数据集idx： 1~M
+		userIdx = rateNodeArray[i].u - 1;
+		rateNodeArray[i].u = permRow[userIdx];	// FIXME: 假设数据集idx： 1~M
 	}
 }
 
@@ -727,8 +741,8 @@ void columnShuffle(vector<int> &permColumn)
 #pragma omp parallel for 
 	for (int i = 0; i < NNZ; ++i)
 	{
-		itemIdx = rateNodeArray[i].i;
-		rateNodeArray[i].i = permColumn[itemIdx-1];	// FIXME: 假设数据集idx： 1~N
+		itemIdx = rateNodeArray[i].i - 1;
+		rateNodeArray[i].i = permColumn[itemIdx];	// FIXME: 假设数据集idx： 1~N
 	}
 
 	// debug:
@@ -739,13 +753,16 @@ void columnShuffle(vector<int> &permColumn)
 void matrixShuffle()
 {
 	// debug:
-	printVar("NNZ", NNZ);
-	sortRateNodeArrayBid();
-	memset(worksetArray, 0, subBlockNum*sizeof(sWorkset));
-	memset(subsetArray, 0, subBlockNum*sizeof(int));
-	setWorkset();
+	//printVar("NNZ", NNZ);
+	//sortRateNodeArrayBid();
+	//memset(worksetArray, 0, subBlockNum*sizeof(sWorkset));
+	//memset(subsetArray, 0, subBlockNum*sizeof(int));
+	//setWorkset();
+	// debug:
+	/*
 	cout << "subsetArray: ";
 	printList(subsetArray, subBlockNum);
+	*/
 
 	vector<int> bestPermRow;
 	vector<int> bestPermColumn;
@@ -756,11 +773,15 @@ void matrixShuffle()
 	{
 		rowShuffle(permRow);
 		columnShuffle(permColumn);
-		resetAllNode_blockIdx();	// 变换后重置bid
-		sortRateNodeArrayBid();
-		memset(worksetArray, 0, subBlockNum*sizeof(sWorkset));
+
+		// 交给computeSubsetArray()避免多次遍历
+		//resetAllNode_blockIdx();	// 变换后重置bid
+
+		//sortRateNodeArrayBid();
+		//memset(worksetArray, 0, subBlockNum*sizeof(sWorkset));
 		memset(subsetArray, 0, subBlockNum*sizeof(int));
-		setWorkset();
+		//setWorkset();
+		computeSubsetArray();
 
 		// debug:
 		/*
@@ -776,9 +797,11 @@ void matrixShuffle()
 			bestPermColumn.assign(permColumn.begin(), permColumn.end());
 			printVar("cur_diff", cur_diff);
 		}
+		
 	}
 	permRow.assign(bestPermRow.begin(), bestPermRow.end());
 	permColumn.assign(bestPermColumn.begin(), bestPermColumn.end());
+	resetAllNode_blockIdx_label();
 }
 
 // DELETE: 不用排序直接变换也可以
@@ -1025,14 +1048,14 @@ void getBlockXY(int u, int i, int &x, int &y)
 // 子块b_xy 是第s种模式中的第t个子块, 则把computeSubBlockID(z, x, y)的结果放入pattern(s,t)
 void setPattern(int s, int t, int x, int y)
 {
-	matrixPattern[s][t] = computeSubBlockID(subBlockLen, x, y);
+	*(matrixPattern + s*subBlockNumL + t) = computeSubBlockID(subBlockLen, x, y);
 }
 
 // 记录子块b_xy的ID: bid到二维数组pattern(s, t) 
 // 子块bid是第s种模式中的第t个子块, 则把bid放入pattern(s,t)
 void setPattern(int s, int t, int bid)
 {
-	matrixPattern[s][t] = bid;
+	*(matrixPattern + s*subBlockNumL + t) = bid;
 }
 
 // DELETE
@@ -1111,6 +1134,34 @@ void labelSubBlock(int subBlockIdxX, int subBlockIdxY)
 }
 */
 
+// debug:
+// 输出user item
+void printNodeArrayMatrix()
+{
+	sortRateNodeArrayUserItem();
+	map<int, vector<int>> imap;
+	int userIdx;
+	int itemIdx;
+	for (int idx = 0; idx < NNZ; ++idx)
+	{
+		userIdx = rateNodeArray[idx].u;
+		itemIdx = rateNodeArray[idx].i;
+		imap[userIdx].push_back(itemIdx);
+	}
+
+	for (int i = 0; i < M; ++i)
+	{
+		for (int j = 0; j < imap[i].size(); ++j)
+		{
+			cout << imap[i][j] << "\t";
+		}
+		cout << endl;
+	}
+}
+
+
+
+
 
 
 // debug:
@@ -1127,9 +1178,38 @@ void unitTest()
 		printLine();
 	}
 	*/
-	initAllData();
 
-	matrixShuffle();
+	//initAllData();
+	CALL_FUN_TIME(initAllData())
+
+	//matrixShuffle();
+	//CALL_FUN_TIME(matrixShuffle())
+
+	//sortRateNodeArrayBid();
+	CALL_FUN_TIME(sortRateNodeArrayBid())
+
+	// 矩阵变换后需重置
+	memset(worksetArray, 0, subBlockNum*sizeof(sWorkset));
+	memset(subsetArray, 0, subBlockNum*sizeof(int));
+	CALL_FUN_TIME(setWorkset())		//setWorkset();
+	CALL_FUN_TIME(setWorkseg())		//setWorkseg();
+	CALL_FUN_TIME(setAllPattern())	//setAllPattern();
+
+	CALL_FUN_TIME(solveByGPU(rateNodeArray, matrixUser, matrixItem, worksetArray,
+			   mWorkseg, matrixPattern, subBlockNumL, subBlockLen, 
+			   lambda, gamma, NNZ))
+	
+	//debug:
+	/*
+	typeRate *matrixPredict = new typeRate[M*N];
+	memset(matrixPredict, 0, M*N*sizeof(typeRate));
+	matrixMultiply(matrixUser, matrixItem, matrixPredict);
+	
+	printMatrix(matrixUser, M, K);
+	printMatrix(matrixItem, N, K);
+	printMatrix(matrixPredict, M, N);
+	printNodeArrayMatrix();
+	*/
 }
 
 
@@ -1137,15 +1217,34 @@ void unitTest()
 void execute()
 {
 	// 初试化、输入、内存分配(array matrix并及时memset为0)
+	initParameter();
 	readFile(inputFile); // 评分矩阵
-	// memset(matrixPattern, -1, subBlockNum*sizeof(int));
+	initAllData();
 
-	// CPU处理
 	
+	// CPU处理
+	matrixShuffle();
+	sortRateNodeArrayBid();
+	// 矩阵变换后需重置
+	memset(worksetArray, 0, subBlockNum*sizeof(sWorkset));
+	memset(subsetArray, 0, subBlockNum*sizeof(int));
+	setWorkset();
+	setWorkseg();
+	setAllPattern();
+	
+
 	// 调用GPU程序
+
+
+	// 矩阵重置: 根据permRow, permCol还原matrixUser, matrixItem
+
 
 	// 保存结果 (model)
 
+	
 	// 如果执行方式为：预测
 	// 预测并保存结果
+
+	
+	// 内存free
 }
