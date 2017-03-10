@@ -231,7 +231,7 @@ void solveByGPU(
 		{
 			for (int s = 0; s < subBlockNumL; ++s)
 			{
-				sgd_kernel << < dim_grid, dim_block >> >(
+				sgd_kernel <<< dim_grid, dim_block >>> (
 															d_rateNodeArray,
 															d_matrixUser,
 															d_matrixItem,
@@ -246,10 +246,10 @@ void solveByGPU(
 															gamma					// Ñ§Ï°ÂÊ
 														);
 			}
-			res = cudaMemcpy(matrixUser, d_matrixUser, M*K * sizeof(typeRate), cudaMemcpyDeviceToHost); CHECK(res)
-			printMatrix(matrixUser, M, K);
+			//cudaMemcpy(matrixUser, d_matrixUser, M*K * sizeof(typeRate), cudaMemcpyDeviceToHost); CHECK(res)
+			//printMatrix(matrixUser, M, K);
 		}
-
+	
 	res = cudaMemcpy(matrixUser, d_matrixUser, M*K * sizeof(typeRate), cudaMemcpyDeviceToHost); CHECK(res)
 	res = cudaMemcpy(matrixItem, d_matrixItem, N*K * sizeof(typeRate), cudaMemcpyDeviceToHost); CHECK(res)
 

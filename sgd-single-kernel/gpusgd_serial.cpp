@@ -1195,6 +1195,9 @@ void unitTest()
 	CALL_FUN_TIME(setWorkseg())		//setWorkseg();
 	CALL_FUN_TIME(setAllPattern())	//setAllPattern();
 
+	fclose(stdin);
+	freopen("CON", "r", stdin);   //"CON"代表控制台
+
 	CALL_FUN_TIME(solveByGPU(rateNodeArray, matrixUser, matrixItem, worksetArray,
 			   mWorkseg, matrixPattern, subBlockNumL, subBlockLen, 
 			   lambda, gamma, NNZ))
