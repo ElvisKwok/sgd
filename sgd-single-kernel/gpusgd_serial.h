@@ -303,7 +303,7 @@ int checkSubBlockBoundary(int bid);
 */
 
 // 计算子块b_xy的ID，其中子块大小为: subBlockLen * subBlockLen
-int computeSubBlockID(int subBlockLen, int x, int y);
+int computeSubBlockID(int subBlockNumL, int x, int y);
 
 // 计算bid对应的子块x,y下标
 void getBlockXY(int bid, int &x, int &y);
@@ -334,8 +334,13 @@ void computeAllSubset();
 
 
 
-
 // 总执行函数
 void execute();
+
+// sgd CPU update
+void sgd_CPU();
+// FGMF CPU版本
+void FGMF_CPU();
+
 
 #endif

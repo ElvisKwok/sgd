@@ -8,6 +8,7 @@ string inputFile = "input/10by10.txt";
 string resultFile = "output/predict_result.txt";
 string modelFile = "output/model.txt";
 
+
 int MAX_ITER;				// 最大迭代次数
 int MAX_SHUFFLE;			// 最大矩阵变换次数
 double lambda;				// 正则化系数
@@ -101,6 +102,47 @@ void printRateNode(sRateNode &node)
 	printVar("node.label", node.label);
 }
 
+// debug:
+void printMatrixPattern()
+{
+	cout << "\nprintMatrixPattern: " << endl;
+	for (int i = 0; i < subBlockNumL; ++i)
+	{
+		for (int j = 0; j < subBlockNumL; ++j)
+		{
+			cout << (matrixPattern + i*subBlockNumL)[j] << "\t";
+		}
+		cout << endl;
+	}
+	cout << endl;
+}
+
+// debug:
+void printWorksetArray()
+{
+	cout << "printWorksetArray: " << endl;
+	for (int i = 0; i < subBlockNum; ++i)
+	{
+		cout << "[" << worksetArray[i].beg << ", " << worksetArray[i].end << ")\t";
+	}
+	cout << '\n' << endl;
+}
+
+// debug:
+void printMatrixWorkseg()
+{
+	cout << "printMatrixWorkseg: " << endl;
+	for (int i = 0; i < subBlockNum; ++i)
+	{
+		for (int j = 0; j < subBlockLen; ++j)
+		{
+			cout << "[" << (mWorkseg + i*subBlockLen)[j].from << ", " << (mWorkseg + i*subBlockLen)[j].to << ")\t";
+		}
+		cout << endl;
+	}
+	cout << endl;
+}
+
 
 // 输出训练模型(matrixUser, matrixItem)
 void writeFile(string fileName)
@@ -187,7 +229,7 @@ void initBlockDimension()
 	// debug:
 	printVar("subBlockNum", subBlockNum);
 	printVar("subBlockLen", subBlockLen);
-	printVar("subBlockNodeNum", subBlockNodeNum);
+	//printVar("subBlockNodeNum", subBlockNodeNum);
 	printLine();
 }
 
@@ -425,6 +467,12 @@ void setAllPattern()
 			pattern = (subBlockNumL - x + y) % subBlockNumL;
 			int t = cnt[pattern]++;		// 第s模式的第t个子块
 			setPattern(pattern, t, bid);
+			//debug:
+			/*
+			printVar("pattern", pattern);
+			printVar("t", t);
+			printVar("bid", bid);
+			*/
 		}
 	}
 }
@@ -771,9 +819,6 @@ void matrixShuffle()
 	int cur_diff;
 	for (int i = 0; i < MAX_SHUFFLE; ++i)
 	{
-		rowShuffle(permRow);
-		columnShuffle(permColumn);
-
 		// 交给computeSubsetArray()避免多次遍历
 		//resetAllNode_blockIdx();	// 变换后重置bid
 
@@ -797,7 +842,10 @@ void matrixShuffle()
 			bestPermColumn.assign(permColumn.begin(), permColumn.end());
 			printVar("cur_diff", cur_diff);
 		}
-		
+
+		// 保存以前的best再变换
+		rowShuffle(permRow);
+		columnShuffle(permColumn);
 	}
 	permRow.assign(bestPermRow.begin(), bestPermRow.end());
 	permColumn.assign(bestPermColumn.begin(), bestPermColumn.end());
@@ -1024,16 +1072,16 @@ int checkSubBlockBoundary(int bid)
 */
 
 // 计算子块x, y对应的bid，其中子块大小为: subBlockLen * subBlockLen
-int computeSubBlockID(int subBlockLen, int subBlockIdxX, int subBlockIdxY)
+int computeSubBlockID(int subBlockNumL, int subBlockIdxX, int subBlockIdxY)
 {
-	return subBlockIdxX * subBlockLen + subBlockIdxY;
+	return subBlockIdxX * subBlockNumL + subBlockIdxY;
 }
 
-// 计算bid对应的子块x,y下标
+// 计算bid对应的子块x,y下标 (0开始)
 void getBlockXY(int bid, int &x, int &y)
 {
-	x = (bid / subBlockLen) + 1;
-	y = bid % subBlockLen;
+	x = (bid / subBlockNumL);
+	y = bid % subBlockNumL;
 }
 
 // 计算Rui所属的子块x,y下标
@@ -1048,7 +1096,7 @@ void getBlockXY(int u, int i, int &x, int &y)
 // 子块b_xy 是第s种模式中的第t个子块, 则把computeSubBlockID(z, x, y)的结果放入pattern(s,t)
 void setPattern(int s, int t, int x, int y)
 {
-	*(matrixPattern + s*subBlockNumL + t) = computeSubBlockID(subBlockLen, x, y);
+	*(matrixPattern + s*subBlockNumL + t) = computeSubBlockID(subBlockNumL, x, y);
 }
 
 // 记录子块b_xy的ID: bid到二维数组pattern(s, t) 
@@ -1167,8 +1215,8 @@ void printNodeArrayMatrix()
 // debug:
 void unitTest()
 {
-	initParameter();
-	readFile(inputFile);
+	CALL_FUN_TIME(initParameter())
+	CALL_FUN_TIME(readFile(inputFile))
 	
 	/*
 	sortRateNodeArrayBid();
@@ -1183,7 +1231,7 @@ void unitTest()
 	CALL_FUN_TIME(initAllData())
 
 	//matrixShuffle();
-	//CALL_FUN_TIME(matrixShuffle())
+	CALL_FUN_TIME(matrixShuffle())
 
 	//sortRateNodeArrayBid();
 	CALL_FUN_TIME(sortRateNodeArrayBid())
@@ -1198,10 +1246,17 @@ void unitTest()
 	fclose(stdin);
 	freopen("CON", "r", stdin);   //"CON"代表控制台
 
+	// debug:
+	printMatrixPattern();
+	printWorksetArray();
+	printMatrixWorkseg();
+
+	///*
 	CALL_FUN_TIME(solveByGPU(rateNodeArray, matrixUser, matrixItem, worksetArray,
 			   mWorkseg, matrixPattern, subBlockNumL, subBlockLen, 
 			   lambda, gamma, NNZ))
-	
+	//*/
+
 	//debug:
 	/*
 	typeRate *matrixPredict = new typeRate[M*N];
@@ -1250,4 +1305,71 @@ void execute()
 
 	
 	// 内存free
+}
+
+// sgd CPU update
+void sgd_CPU()
+{
+    for(int iter = 0; iter < MAX_ITER; ++iter)
+    {
+        for(int i = 0; i < NNZ; ++i)
+        {
+            int userIdx = rateNodeArray[i].u - 1;
+            int itemIdx = rateNodeArray[i].i - 1;
+            double rate = rateNodeVector[i].rate;
+            double predict = innerProduct(matrixUser, matrixItem, userIdx, itemIdx);
+            double err = rate - predict;
+
+            for(int k = 0; k < K; ++k)
+            {
+                double tmp = (*(matrixUser + userIdx * K + k));
+                (*(matrixUser + userIdx * K + k)) += (gamma * (err * (*(matrixItem + itemIdx * K + k)) - lambda * tmp));
+                (*(matrixItem + itemIdx * K + k)) += (gamma * (err * tmp - lambda * (*(matrixItem + itemIdx * K + k))));
+            }
+        }
+
+        double err_sum = 0;
+
+        for(int i = 0; i < NNZ; ++i)
+        {
+            int userIdx = rateNodeArray[i].u - 1;
+            int itemIdx = rateNodeArray[i].i - 1;
+            double rate = rateNodeArray[i].rate;
+            double predict = innerProduct(matrixUser, matrixItem, userIdx, itemIdx);
+            double err = rate - predict;
+            err_sum += pow(err, 2);
+        }
+
+        double rmse = sqrt(err_sum / NNZ);
+        cout << "iter: " << iter << "\t rmse: " << rmse << endl;
+    }
+}
+
+// FGMF CPU版本
+void FGMF_CPU()
+{
+    CALL_FUN_TIME(initParameter())
+    CALL_FUN_TIME(readFile(inputFile))
+    /*
+    sortRateNodeArrayBid();
+    for (int i = 0; i < rateNodeVector.size(); ++i)
+    {
+    printRateNode(rateNodeArray[i]);
+    printLine();
+    }
+    */
+    //initAllData();
+    CALL_FUN_TIME(initAllData())
+    //matrixShuffle();
+    //CALL_FUN_TIME(matrixShuffle())
+    //sortRateNodeArrayBid();
+    CALL_FUN_TIME(sortRateNodeArrayBid())
+    // 矩阵变换后需重置
+    memset(worksetArray, 0, subBlockNum * sizeof(sWorkset));
+    memset(subsetArray, 0, subBlockNum * sizeof(int));
+    CALL_FUN_TIME(setWorkset())     //setWorkset();
+    CALL_FUN_TIME(setWorkseg())     //setWorkseg();
+    CALL_FUN_TIME(setAllPattern())  //setAllPattern();
+
+	sgd_CPU();
 }

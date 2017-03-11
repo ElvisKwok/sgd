@@ -14,6 +14,8 @@
 
 using namespace std;
 
+extern string inputFile;
+string outputFile;
 
 // test label
 void label_matrix(int *matrixA, int N)
@@ -54,17 +56,27 @@ void callGPU()
 
 void test()
 {
-	string outputFile = "output/console_output.txt";
+	outputFile = "output/FGMF_result_" + inputFile.substr(inputFile.find('/') + 1);
+	stringstream ss;
+	ss << (int)time(NULL);
+	outputFile += ss.str();
+
 	freopen(outputFile.c_str(), "w", stdout);
 	unitTest();
-	
+	//FGMF_CPU();
 }
 
 
-int main()
+int main(int argc, char** argv)
 {
 	srand((unsigned)time(NULL));
 
+	if (argc > 1){
+		inputFile = argv[1];
+	}
+	if (argc > 2){
+		outputFile = argv[2];
+	}
 
 #if 0
 	string inputFile = "input.txt";

@@ -7,6 +7,7 @@
 #include <cuda_runtime.h>
 #include <device_launch_parameters.h>	//  vs消除未定义的提示
 #include <device_functions.h>
+#include <cublas_v2.h>
 
 #include <iostream>
 #include <algorithm>
