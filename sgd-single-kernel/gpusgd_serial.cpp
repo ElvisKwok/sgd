@@ -2,9 +2,9 @@
 #include "sgd.h"
 
 string parameterFile = "input/parameter.txt";
-//string inputFile = "input/ra.test_awk";
+string inputFile = "input/ra.test_awk";
 //string inputFile = "input/input.txt";
-string inputFile = "input/10by10.txt";
+//string inputFile = "input/10by10.txt";
 string resultFile = "output/predict_result.txt";
 string modelFile = "output/model.txt";
 
@@ -47,15 +47,21 @@ sWorkseg *mWorkseg;		// size: subBlockNum * subBlockLen, 即 bid*tag
 
 
 vector<sRateNode> rateNodeVector;	// 用于动态读取输入
-sRateNode *rateNodeArray;
+vector<sRateNode> rateNodeVector_backup;	// 原始备份，矩阵变换后的应用
+sRateNode *rateNodeArray;			// 随着矩阵变换而改动
 
 // DELETE ?
 sSubBlock *subBlockArray;	// size: subBlockNum个子块
 
-vector<int> permRow;		// 保存最终的行变换策略，size: M (注意值的范围是1~M，而不是0~M-1)
+vector<int> permRow;		// 可用于应用/还原，保存最终的行变换策略，size: M (注意值的范围是1~M，而不是0~M-1)
 vector<int> permColumn;		// 保存最终的列变换策略，size: N
 
-
+// 暂时不用
+// 用于正式测试只有userIdx和itemIdx的数据集
+/*
+vector<sRateNode> rateNodeVector_predict;	// 用于动态读取输入
+sRateNode *rateNodeArray_predict;			// &rateNodeVector_predict[0]
+*/
 
 /********************************* BEGIN:  File Process *********************************/
 // 读取输入文件：
@@ -110,7 +116,7 @@ void printMatrixPattern()
 	{
 		for (int j = 0; j < subBlockNumL; ++j)
 		{
-			cout << (matrixPattern + i*subBlockNumL)[j] << "\t";
+			cout << (matrixPattern + i*subBlockNumL)[j] << " ";
 		}
 		cout << endl;
 	}
@@ -256,7 +262,9 @@ void initAllData()
 	//sWorkseg *mWorkseg;		// 子块bid中每个评价值组tag的边界from和to, size: (subBlockNumL * subBlockNumL) * subBlockLen, 即 bid*tag
 	newArray(mWorkseg, subBlockNum * subBlockLen, 0);
 
+	// DELETE: 交给matrix_shuffle
 	// 初始化permRow, permColumn
+	/*
 	int i;
 	for (i = 0; (i < M) && (i < N); ++i)
 	{
@@ -273,6 +281,7 @@ void initAllData()
 		permColumn.push_back(i+1);
 		++i;
 	}
+	*/
 }
 
 /********************************** END:  File Process **********************************/
@@ -747,41 +756,50 @@ ptrdiff_t(*p_myrandom)(ptrdiff_t) = myrandom;
 
 
 // 矩阵行shuffle NNZ版本(基于任意顺序的rateNodeArray)
-// note: 要保存perm，用于复原, permRow大小为M, 初始化为{1, 2, ..., M}
-void rowShuffle(vector<int> &permRow)
+// note: 要保存bestPermRow，用于复原, permRow大小为M, 初始化为{1, 2, ..., M}
+void rowShuffle(vector<int> &curPermRow, vector<int> &bestPermRow)
 {
 	srand((unsigned)time(NULL));
 	//cout << "rowShuffle called: " << endl;
-	int userIdx;
+	//int userIdx;
 	/*
 	for (int i = 0; i < M; ++i)
 	{
 		permRow[i] = i;
 	}
 	*/
-	random_shuffle(permRow.begin(), permRow.end(), p_myrandom);
+	random_shuffle(curPermRow.begin(), curPermRow.end(), p_myrandom);
 #pragma omp parallel for 
 	for (int i = 0; i < NNZ; ++i)
 	{
+		//question: 竞争?
+		/*
 		userIdx = rateNodeArray[i].u - 1;
 		rateNodeArray[i].u = permRow[userIdx];	// FIXME: 假设数据集idx： 1~M
+		*/
+		rateNodeArray[i].u = curPermRow[rateNodeArray[i].u - 1];	// FIXME: 假设数据集idx： 1~M
+	}
+#pragma omp parallel for 
+	for (int i = 0; i < M; ++i)
+	{
+		bestPermRow[i] = curPermRow[bestPermRow[i] - 1];
 	}
 }
 
 // 矩阵列shuffle NNZ版本(基于任意顺序的rateNodeArray)
-// note: 要保存perm，用于复原, permColumn大小为N, 初始化为{1, 2, ..., N}
-void columnShuffle(vector<int> &permColumn)
+// note: 要保存bestPermColumn，用于复原, permColumn大小为N, 初始化为{1, 2, ..., N}
+void columnShuffle(vector<int> &curPermColumn, vector<int> &bestPermColumn)
 {
 	srand((unsigned)time(NULL));
 	//cout << "columnShuffle called: " << endl;
-	int itemIdx;
+	//int itemIdx;
 	/*
 	for (int i = 0; i < N; ++i)
 	{
 		permColumn[i] = i;
 	}
 	*/
-	random_shuffle(permColumn.begin(), permColumn.end(), p_myrandom);
+	random_shuffle(curPermColumn.begin(), curPermColumn.end(), p_myrandom);
 	
 	// debug:
 	//printList(&permColumn[0], N);
@@ -789,8 +807,17 @@ void columnShuffle(vector<int> &permColumn)
 #pragma omp parallel for 
 	for (int i = 0; i < NNZ; ++i)
 	{
+		//question: 竞争?
+		/*
 		itemIdx = rateNodeArray[i].i - 1;
 		rateNodeArray[i].i = permColumn[itemIdx];	// FIXME: 假设数据集idx： 1~N
+		*/
+		rateNodeArray[i].i = curPermColumn[rateNodeArray[i].i - 1];	// FIXME: 假设数据集idx： 1~N
+	}
+#pragma omp parallel for 
+	for (int i = 0; i < N; ++i)
+	{
+		bestPermColumn[i] = curPermColumn[bestPermColumn[i] - 1];
 	}
 
 	// debug:
@@ -800,6 +827,8 @@ void columnShuffle(vector<int> &permColumn)
 // 矩阵随机变换(最优解)
 void matrixShuffle()
 {
+
+	rateNodeVector_backup = rateNodeVector;
 	// debug:
 	//printVar("NNZ", NNZ);
 	//sortRateNodeArrayBid();
@@ -812,8 +841,32 @@ void matrixShuffle()
 	printList(subsetArray, subBlockNum);
 	*/
 
-	vector<int> bestPermRow;
+	vector<int> curPermRow;		// 当前所应用的变换策略
+	vector<int> curPermColumn;
+	vector<int> bestPermRow;	// 模拟{1, 2, 3,...,M}开始变换，可以从原始"一步"变成rateNodeArray当前状态的序列
 	vector<int> bestPermColumn;
+
+	// 初始化permRow, permColumn
+	int i;
+	for (i = 0; (i < M) && (i < N); ++i)
+	{
+		curPermRow.push_back(i + 1);
+		curPermColumn.push_back(i + 1);
+		bestPermRow.push_back(i + 1);
+		bestPermColumn.push_back(i + 1);
+	}
+	while (i < M)
+	{
+		curPermRow.push_back(i + 1);
+		bestPermRow.push_back(i + 1);
+		++i;
+	}
+	while (i < N)
+	{
+		curPermColumn.push_back(i + 1);
+		bestPermColumn.push_back(i + 1);
+		++i;
+	}
 
 	int min_diff = NNZ;
 	int cur_diff;
@@ -838,19 +891,67 @@ void matrixShuffle()
 		if (cur_diff < min_diff)
 		{
 			min_diff = cur_diff;
-			bestPermRow.assign(permRow.begin(), permRow.end());
-			bestPermColumn.assign(permColumn.begin(), permColumn.end());
+			permRow.assign(bestPermRow.begin(), bestPermRow.end());
+			permColumn.assign(bestPermColumn.begin(), bestPermColumn.end());
 			printVar("cur_diff", cur_diff);
+			// debug:
+			/*
+			cout << "subsetArray: ";
+			printList(subsetArray, subBlockNum);
+			cout << "bestPermRow: ";
+			printList(&bestPermRow[0], M);
+			cout << "bestPermColumn: ";
+			printList(&bestPermColumn[0], N);
+			*/
 		}
 
-		// 保存以前的best再变换
-		rowShuffle(permRow);
-		columnShuffle(permColumn);
+		// 保存之前的best再变换，最后一次变换不采用
+		rowShuffle(curPermRow, bestPermRow);
+		columnShuffle(curPermColumn, bestPermColumn);
 	}
-	permRow.assign(bestPermRow.begin(), bestPermRow.end());
-	permColumn.assign(bestPermColumn.begin(), bestPermColumn.end());
+	matrixShuffleApply();
 	resetAllNode_blockIdx_label();
 }
+
+// rateNodeArray指向备份矩阵，应用最终的变换
+void matrixShuffleApply()
+{
+	rateNodeArray = &rateNodeVector_backup[0];
+	//应用最终的变换
+#pragma omp parallel for 
+	for (int i = 0; i < NNZ; ++i)
+	{
+		rateNodeArray[i].u = permRow[rateNodeArray[i].u - 1];	// FIXME: 假设数据集idx： 1~M
+		rateNodeArray[i].i = permColumn[rateNodeArray[i].i - 1];	// FIXME: 假设数据集idx： 1~N
+	}
+}
+
+// 暂时不用
+/*
+// TO-DO
+// 矩阵变换后，还原matrixUser, matrixItem到正确的行、列，用于预测。
+void matrixShuffleRecover()
+{
+	vector<int> hashVectorRow(M+1);
+	vector<int> hashVectorCol(N+1);
+	for (int i = 1; i <= M; ++i)
+	{
+		hashVectorRow[permRow[i-1]] = i;
+	}
+	for (int i = 1; i <= N; ++i)
+	{
+		hashVectorCol[permColumn[i-1]] = i;
+	}
+
+	//TO-DO
+}
+*/
+
+
+
+
+
+
 
 // DELETE: 不用排序直接变换也可以
 // 矩阵行shuffle NNZ版本(基于rateNodeArray（原始输入，排序前），即按userIdx排序)
@@ -1231,7 +1332,7 @@ void unitTest()
 	CALL_FUN_TIME(initAllData())
 
 	//matrixShuffle();
-	CALL_FUN_TIME(matrixShuffle())
+	//CALL_FUN_TIME(matrixShuffle())
 
 	//sortRateNodeArrayBid();
 	CALL_FUN_TIME(sortRateNodeArrayBid())
@@ -1243,19 +1344,23 @@ void unitTest()
 	CALL_FUN_TIME(setWorkseg())		//setWorkseg();
 	CALL_FUN_TIME(setAllPattern())	//setAllPattern();
 
+
 	fclose(stdin);
 	freopen("CON", "r", stdin);   //"CON"代表控制台
 
 	// debug:
-	printMatrixPattern();
-	printWorksetArray();
-	printMatrixWorkseg();
+	//printMatrixPattern();
+	//printWorksetArray();
+	//printMatrixWorkseg();
+	//printList(&permRow[0], M);
+	//printList(&permColumn[0], N);
+	//printNodeArrayAsMatrix();
 
-	///*
+	/*
 	CALL_FUN_TIME(solveByGPU(rateNodeArray, matrixUser, matrixItem, worksetArray,
 			   mWorkseg, matrixPattern, subBlockNumL, subBlockLen, 
 			   lambda, gamma, NNZ))
-	//*/
+	*/
 
 	//debug:
 	/*
@@ -1371,5 +1476,5 @@ void FGMF_CPU()
     CALL_FUN_TIME(setWorkseg())     //setWorkseg();
     CALL_FUN_TIME(setAllPattern())  //setAllPattern();
 
-	sgd_CPU();
+	CALL_FUN_TIME(sgd_CPU())
 }

@@ -84,19 +84,22 @@ __device__ void sgdUpdate(
     double gamma                // 学习率
 )
 {
-    typeRate predictRate = innerProduct(userIdx, itemIdx, matrixUser, matrixItem, K);
-    typeRate error = rate - predictRate;
-    typeRate tmp;
+    //typeRate predictRate = innerProduct(userIdx, itemIdx, matrixUser, matrixItem, K);
+    //typeRate error = rate - predictRate;
+	typeRate error = rate - innerProduct(userIdx, itemIdx, matrixUser, matrixItem, K);
+    //typeRate tmp;
 
     for(int k = 0; k < K; ++k)
     {
-        /*
+        ///*
         (*(matrixUser + userIdx*K + k)) += (gamma * (2 * error * (*(matrixItem + itemIdx*K + k)) - lambda * (*(matrixUser + userIdx*K + k))));
         (*(matrixItem + itemIdx*K + k)) += (gamma * (2 * error * (*(matrixUser + userIdx*K + k)) - lambda * (*(matrixItem + itemIdx*K + k))));
-        */
+        //*/
+		/*
         tmp = (*(matrixUser + userIdx * K + k));
         (*(matrixUser + userIdx * K + k)) += (gamma * (error * (*(matrixItem + itemIdx * K + k)) - lambda * tmp));
         (*(matrixItem + itemIdx * K + k)) += (gamma * (error * tmp - lambda * (*(matrixItem + itemIdx * K + k))));
+		*/
     }
 }
 
@@ -143,11 +146,14 @@ __global__ void sgd_kernel(
         // c++风格 end为下一个位置
         for(int iRate = from + tid; iRate < to; iRate += blockDim.x)    // iRate为 属于子块bid && 标签为tag 的评价值 在rateNodeArray数组的下标
         {
-            typeRate rate = d_rateNodeArray[iRate].rate;
-            int userIdx = d_rateNodeArray[iRate].u - 1;
-            int itemIdx = d_rateNodeArray[iRate].i - 1;
-            sgdUpdate(rate, userIdx, itemIdx, d_matrixUser, d_matrixItem, K, lambda, gamma);
+            //typeRate rate = d_rateNodeArray[iRate].rate;
+            //int userIdx = d_rateNodeArray[iRate].u - 1;
+            //int itemIdx = d_rateNodeArray[iRate].i - 1;
+            //sgdUpdate(rate, userIdx, itemIdx, d_matrixUser, d_matrixItem, K, lambda, gamma);
+			sgdUpdate(d_rateNodeArray[iRate].rate, d_rateNodeArray[iRate].u - 1, d_rateNodeArray[iRate].i - 1, d_matrixUser, d_matrixItem, K, lambda, gamma);
             //printf("userIdx = %d, itemIdx = %d\n", userIdx, itemIdx);
+			//printf("from = %d, to = %d, iRate = %d\nbidx = %d, tid = %d, bid = %d,s = %d\n", from, to, iRate, bidx, tid, bid,s);
+
         }
 
         // wait for all threads in this block to arrive here(i.e. current tag finish)
@@ -155,66 +161,71 @@ __global__ void sgd_kernel(
     }
 }
 
-
-//bug:
+// DELETE:
+/*
 __global__ void innerProduct_kernel(int userIdx, int itemIdx, typeRate *d_matrixUser, typeRate *d_matrixItem, typeRate *result, int K)
 {
-	__shared__ typeRate tmp[1024];
-	const int tidx = threadIdx.x;	// inside block index
-	const int bidx = blockIdx.x;
-	int tid = blockIdx.x * blockDim.x + threadIdx.x; // global index
-	const int step = blockDim.x * gridDim.x;
-	double temp = 0.0;
-	while (tid < K)
-	{
-		temp += (d_matrixUser + userIdx* K)[tid] * (d_matrixItem + itemIdx* K)[tid];
-		tid += step;
-	}
-	tmp[tidx] = temp;
-	__syncthreads();
-	int i = 1024 / 2;
-	while (i != 0)
-	{
-		if (tidx < i)
-		{
-			tmp[tidx] += tmp[tidx + i];
-		}
-		__syncthreads();
-		i /= 2;
-	}
-	if (tidx == 0)
-	{
-		*result = tmp[0];
-	}
+    __shared__ typeRate tmp[1024];
+    const int tidx = threadIdx.x;   // inside block index
+    const int bidx = blockIdx.x;
+    int tid = blockIdx.x * blockDim.x + threadIdx.x; // global index
+    const int step = blockDim.x;
+    double temp = 0.0;
 
+    while(tid < K)
+    {
+        temp += (d_matrixUser + userIdx * K)[tid] * (d_matrixItem + itemIdx * K)[tid];
+        tid += step;
+    }
+
+    tmp[tidx] = temp;
+    __syncthreads();
+    int i = 1024 / 2;
+
+    while(i != 0)
+    {
+        if(tidx < i)
+        {
+            tmp[tidx] += tmp[tidx + i];
+        }
+
+        __syncthreads();
+        i /= 2;
+    }
+
+    if(tidx == 0)
+    {
+        *result = tmp[0];
+    }
 }
+*/
 
-//bug:
+//bug: slow
 typeRate computeRMSE_GPU(sRateNode *d_rateNodeArray, typeRate *d_matrixUser, typeRate *d_matrixItem, int NNZ, int K)
 {
-    //cublasHandle_t handle;
-    //cublasCreate(&handle);
+    cublasHandle_t handle;
+    cublasCreate(&handle);
     int userIdx;
     int itemIdx;
-    typeRate predictRate = 0.0;
-	typeRate d_predictRate;
+    typeRate *predictRate = new typeRate[1];
+    //typeRate *d_predictRate;
+    //cudaMalloc((void**)(&d_predictRate), sizeof(typeRate));
     typeRate err_sum = 0.0;
 
     for(int i = 0; i < NNZ; ++i)
     {
         userIdx = d_rateNodeArray[i].u - 1;
         itemIdx = d_rateNodeArray[i].i - 1;
-        //predictRate = innerProduct(d_matrixUser, d_matrixItem, userIdx, itemIdx);
-		cudaMalloc((void**)(&d_predictRate), sizeof(typeRate));
-		//cublasStatus_t ret = cublasDdot_v2(handle, K, (d_matrixUser + userIdx * K), 1, (d_matrixItem + itemIdx * K), 1, &d_predictRate);
-		innerProduct_kernel << <1, 1024 >> >(userIdx, itemIdx, d_matrixUser, d_matrixItem, &d_predictRate, K);
-		cudaMemcpy(&predictRate, &d_predictRate, sizeof(typeRate), cudaMemcpyDeviceToHost);
-
+        cublasStatus_t ret = cublasDdot(handle, K, (d_matrixUser + userIdx * K), 1, (d_matrixItem + itemIdx * K), 1, predictRate);
+        //innerProduct_kernel << <1, 1024 >> >(userIdx, itemIdx, d_matrixUser, d_matrixItem, d_predictRate, K);
+        //cudaMemcpy(predictRate, d_predictRate, sizeof(typeRate), cudaMemcpyDeviceToHost);
         //cout << "(" << userIdx+1 << ", " << itemIdx+1 << "): "<<predictRate << endl;
-        err_sum += pow((d_rateNodeArray[i].rate - predictRate), 2);
+        err_sum += pow((d_rateNodeArray[i].rate - predictRate[0]), 2);
     }
 
-    //cublasDestroy(handle);
+    //cudaFree(d_predictRate);
+    delete[] predictRate;
+    cublasDestroy(handle);
     return sqrt(err_sum / NNZ);
 }
 
@@ -236,6 +247,7 @@ typeRate computeRMSE(sRateNode *rateNodeArray, typeRate *matrixUser, typeRate *m
 
     return sqrt(err_sum / NNZ);
 }
+
 
 void solveByGPU(
     sRateNode *rateNodeArray,
@@ -274,6 +286,7 @@ void solveByGPU(
     int *d_matrixPattern;
     int subBlockNum = subBlockNumL * subBlockNumL;
     cudaError_t res;
+    auto start0 = system_clock::now();
     res = cudaMalloc((void**)(&d_rateNodeArray), NNZ * sizeof(sRateNode));
     CHECK(res)
     res = cudaMalloc((void**)(&d_matrixUser), M * K * sizeof(typeRate));
@@ -298,54 +311,76 @@ void solveByGPU(
     CHECK(res)
     res = cudaMemcpy(d_matrixPattern, matrixPattern, subBlockNum * sizeof(int), cudaMemcpyHostToDevice);
     CHECK(res)
+    auto end0 = system_clock::now();
+    auto duration0 = duration_cast<microseconds>(end0 - start0);
+    cout << "it takes cudaMemcpyHostToDevice\t\t" << double(duration0.count()) * microseconds::period::num / microseconds::period::den << " seconds" << endl;
 
-    /*
-    sgd_kernel << < dim_grid, dim_block >> >(dev_c, dev_a, dev_b, size);
-    */
     for(int iter = 0; iter < MAX_ITER; ++iter)
     {
-        auto start = system_clock::now();
+		cudaEvent_t cu_start;
+		cudaEvent_t cu_stop;
+		float elapsedTime = 0.0;
 
-        for(int s = 0; s < subBlockNumL; ++s)
-        {
-            sgd_kernel << < dim_grid, dim_block >> > (
-                           d_rateNodeArray,
-                           d_matrixUser,
-                           d_matrixItem,
-                           d_worksetArray,
-                           d_mWorkseg,
-                           d_matrixPattern,
-                           s,                      // 第s个模式
-                           subBlockNumL,           // subBlockNumL * subBlockNumL个子块
-                           subBlockLen,            // 子块大小为 subBlockLen * subBlockLen
-                           K,                      // 隐含向量维数
-                           lambda,                 // 正则化系数
-                           gamma                   // 学习率
-                       );
-        }
+		cudaEventCreate(&cu_start);
+		cudaEventCreate(&cu_stop);
+		cudaEventRecord(cu_start, 0);
 
-        auto end = system_clock::now();
-        auto duration = duration_cast<microseconds>(end - start);
-        cout << "it takes one iter\t\t" << double(duration.count()) * microseconds::period::num / microseconds::period::den << " seconds" << endl;
+		for (int s = 0; s < subBlockNumL; ++s)
+		{
+			sgd_kernel << < dim_grid, dim_block >> > (
+				d_rateNodeArray,
+				d_matrixUser,
+				d_matrixItem,
+				d_worksetArray,
+				d_mWorkseg,
+				d_matrixPattern,
+				s,                      // 第s个模式
+				subBlockNumL,           // subBlockNumL * subBlockNumL个子块
+				subBlockLen,            // 子块大小为 subBlockLen * subBlockLen
+				K,                      // 隐含向量维数
+				lambda,                 // 正则化系数
+				gamma                   // 学习率
+				);
+			cudaThreadSynchronize();
+		}
+		cudaEventRecord(cu_stop, 0);
+		cudaEventSynchronize(cu_stop);
+		cudaEventElapsedTime(&elapsedTime, cu_start, cu_stop);
+		cout << iter << "th iter, elapsedTime:\t"  << elapsedTime << "ms" << endl;
+
+        // TO-DO
+        /*
         auto start2 = system_clock::now();
-        //cudaMemcpy(matrixUser, d_matrixUser, M*K * sizeof(typeRate), cudaMemcpyDeviceToHost); CHECK(res)
-        //printMatrix(matrixUser, M, K);
-        cout << "iter: " << iter << "\tRMSE: " << computeRMSE_GPU(rateNodeArray, matrixUser, matrixItem, NNZ, K) << endl;
+        cout << "iter: " << iter << "\tRMSE: " << computeRMSE_GPU(rateNodeArray, d_matrixUser, d_matrixItem, NNZ, K) << endl;
         auto end2 = system_clock::now();
         auto duration2 = duration_cast<microseconds>(end2 - start2);
         cout << "it takes computeRMSE_GPU\t\t" << double(duration2.count()) * microseconds::period::num / microseconds::period::den << " seconds" << endl;
-       
+        */
+        res = cudaMemcpy(matrixUser, d_matrixUser, M * K * sizeof(typeRate), cudaMemcpyDeviceToHost);
+        CHECK(res)
+        res = cudaMemcpy(matrixItem, d_matrixItem, N * K * sizeof(typeRate), cudaMemcpyDeviceToHost);
+        CHECK(res)
+        cout << "RMSE: " << computeRMSE(rateNodeArray, matrixUser, matrixItem, NNZ) << endl;
     }
 
+    auto start1 = system_clock::now();
     res = cudaMemcpy(matrixUser, d_matrixUser, M * K * sizeof(typeRate), cudaMemcpyDeviceToHost);
     CHECK(res)
     res = cudaMemcpy(matrixItem, d_matrixItem, N * K * sizeof(typeRate), cudaMemcpyDeviceToHost);
     CHECK(res)
-    cout << "RMSE: " << computeRMSE(rateNodeArray, matrixUser, matrixItem, NNZ) << endl;
+    auto end1 = system_clock::now();
+    auto duration1 = duration_cast<microseconds>(end1 - start1);
+    cout << "it takes cudaMemcpyDeviceToHost\t\t" << double(duration1.count()) * microseconds::period::num / microseconds::period::den << " seconds" << endl;
+    //cout << "RMSE: " << computeRMSE(rateNodeArray, matrixUser, matrixItem, NNZ) << endl;
+    //cout << "RMSE: " << computeRMSE_GPU(rateNodeArray, d_matrixUser, d_matrixItem, NNZ, K) << endl;
+    auto start2 = system_clock::now();
     cudaFree(d_rateNodeArray);
     cudaFree(d_matrixUser);
     cudaFree(d_matrixItem);
     cudaFree(d_worksetArray);
     cudaFree(d_mWorkseg);
     cudaFree(d_matrixPattern);
+    auto end2 = system_clock::now();
+    auto duration2 = duration_cast<microseconds>(end2 - start2);
+    cout << "it takes cudaFree\t\t" << double(duration2.count()) * microseconds::period::num / microseconds::period::den << " seconds" << endl;
 }

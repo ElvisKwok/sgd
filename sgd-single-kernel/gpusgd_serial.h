@@ -269,15 +269,23 @@ double getEvenness();
 void computeSubsetArray();
 
 // 矩阵行shuffle NNZ版本(基于任意顺序的rateNodeArray)
-// note: 要保存perm，用于复原, permRow大小为M, 初始化为{0, 1, ..., M-1}
-void rowShuffle(vector<int> &permRow);
+// note: 要保存bestPermRow，用于复原, permRow大小为M, 初始化为{1, ..., M}
+void rowShuffle(vector<int> &curPermRow, vector<int> &bestPermRow);
 
 // 矩阵列shuffle NNZ版本(基于任意顺序的rateNodeArray)
-// note: 要保存perm，用于复原, permRow大小为M, 初始化为{0, 1, ..., M-1}
-void columnShuffle(vector<int> &permColumn);
+// note: 要保存bestPermColumn，用于复原, permColumn大小为M, 初始化为{1, ..., N}
+void columnShuffle(vector<int> &curPermColumn, vector<int> &bestPermColumn);
 
 // 矩阵随机变换(最优解)
 void matrixShuffle();
+
+// TO-DO
+// rateNodeArray指向备份矩阵，应用最终的变换
+void matrixShuffleApply();
+
+// TO-DO
+// 矩阵变换后，还原matrixUser, matrixItem到正确的行、列，用于预测。
+void matrixShuffleRecover();
 
 // DELETE: 矩阵shuffle原始版(随机生成矩阵的函数可以用下)
 /*

@@ -39,7 +39,7 @@ void printMatrix(typeRate *m, int rowNum, int colNum)
     {
         for(int j = 0; j < colNum; ++j)
         {
-            cout << (m + i)[j] << " ";
+			cout << (m + i*colNum)[j] << " ";
         }
 
         cout << endl;
