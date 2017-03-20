@@ -135,9 +135,11 @@
     <ClInclude Include="parallelReadFile.h" />
     <ClInclude Include="parameter.h" />
     <ClInclude Include="sgd.h" />
+    <ClInclude Include="test.h" />
   </ItemGroup>
   <ItemGroup>
     <CudaCompile Include="sgd.cu" />
+    <CudaCompile Include="test.cu" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

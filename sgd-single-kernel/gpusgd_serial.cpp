@@ -1,8 +1,11 @@
 #include "gpusgd_serial.h"
 #include "sgd.h"
+#include "test.h"
 
 string parameterFile = "input/parameter.txt";
+//string inputFile = "input/BDMovie";
 string inputFile = "input/ra.test_awk";
+//string inputFile = "input/ra.train_awk";
 //string inputFile = "input/input.txt";
 //string inputFile = "input/10by10.txt";
 string resultFile = "output/predict_result.txt";
@@ -69,8 +72,7 @@ sRateNode *rateNodeArray_predict;			// &rateNodeVector_predict[0]
 // (user, item, rate)
 void readFile(string fileName)
 {
-	initBlockDimension();
-
+	printVar("inputFile", inputFile);
 	// serial read
 	/*
 	ifstream inputFile(fileName);
@@ -206,6 +208,8 @@ void initParameter()
 
 	fclose(stdin);
 	freopen("CON", "r", stdin);   //"CON"代表控制台
+
+	initBlockDimension();
 
 	///*
 	// test
@@ -827,7 +831,6 @@ void columnShuffle(vector<int> &curPermColumn, vector<int> &bestPermColumn)
 // 矩阵随机变换(最优解)
 void matrixShuffle()
 {
-
 	rateNodeVector_backup = rateNodeVector;
 	// debug:
 	//printVar("NNZ", NNZ);
@@ -870,6 +873,9 @@ void matrixShuffle()
 
 	int min_diff = NNZ;
 	int cur_diff;
+	double avg = ((double)NNZ / subBlockNum);
+	printVar("avg", avg);
+	auto start = system_clock::now();
 	for (int i = 0; i < MAX_SHUFFLE; ++i)
 	{
 		// 交给computeSubsetArray()避免多次遍历
@@ -890,10 +896,16 @@ void matrixShuffle()
 		cur_diff = getMaxDiff();
 		if (cur_diff < min_diff)
 		{
+			auto end = system_clock::now(); 
+			auto duration = duration_cast<microseconds>(end - start); 
+			cout << "curTime: \t\t" << double(duration.count()) * microseconds::period::num / microseconds::period::den << " seconds" << endl; 
+			
 			min_diff = cur_diff;
 			permRow.assign(bestPermRow.begin(), bestPermRow.end());
 			permColumn.assign(bestPermColumn.begin(), bestPermColumn.end());
+			double ED = avg / (avg + cur_diff);
 			printVar("cur_diff", cur_diff);
+			printVar("ED", ED);
 			// debug:
 			/*
 			cout << "subsetArray: ";
@@ -909,6 +921,8 @@ void matrixShuffle()
 		rowShuffle(curPermRow, bestPermRow);
 		columnShuffle(curPermColumn, bestPermColumn);
 	}
+
+	// QUESTION:
 	matrixShuffleApply();
 	resetAllNode_blockIdx_label();
 }
@@ -917,6 +931,10 @@ void matrixShuffle()
 void matrixShuffleApply()
 {
 	rateNodeArray = &rateNodeVector_backup[0];
+	if (permRow.empty() || permColumn.empty())
+	{
+		return;
+	}
 	//应用最终的变换
 #pragma omp parallel for 
 	for (int i = 0; i < NNZ; ++i)
@@ -1332,7 +1350,7 @@ void unitTest()
 	CALL_FUN_TIME(initAllData())
 
 	//matrixShuffle();
-	//CALL_FUN_TIME(matrixShuffle())
+	CALL_FUN_TIME(matrixShuffle())
 
 	//sortRateNodeArrayBid();
 	CALL_FUN_TIME(sortRateNodeArrayBid())
@@ -1361,6 +1379,7 @@ void unitTest()
 			   mWorkseg, matrixPattern, subBlockNumL, subBlockLen, 
 			   lambda, gamma, NNZ))
 	*/
+	callKernel(rateNodeArray, matrixUser, matrixItem, M, N, K, worksetArray, mWorkseg, matrixPattern, subBlockNumL, subBlockLen, NNZ);
 
 	//debug:
 	/*
@@ -1465,16 +1484,19 @@ void FGMF_CPU()
     */
     //initAllData();
     CALL_FUN_TIME(initAllData())
+
     //matrixShuffle();
-    //CALL_FUN_TIME(matrixShuffle())
+    CALL_FUN_TIME(matrixShuffle())
+
     //sortRateNodeArrayBid();
     CALL_FUN_TIME(sortRateNodeArrayBid())
+	/*
     // 矩阵变换后需重置
     memset(worksetArray, 0, subBlockNum * sizeof(sWorkset));
     memset(subsetArray, 0, subBlockNum * sizeof(int));
     CALL_FUN_TIME(setWorkset())     //setWorkset();
     CALL_FUN_TIME(setWorkseg())     //setWorkseg();
     CALL_FUN_TIME(setAllPattern())  //setAllPattern();
-
+	*/
 	CALL_FUN_TIME(sgd_CPU())
 }

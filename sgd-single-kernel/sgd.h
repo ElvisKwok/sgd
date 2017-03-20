@@ -17,6 +17,8 @@
 
 using namespace std;
 
+extern int threads_per_block;
+
 void solveByGPU(
 	sRateNode *rateNodeArray,
 	typeRate *matrixUser,
